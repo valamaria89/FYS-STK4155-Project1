@@ -1,6 +1,6 @@
 import numpy as np 
 import sklearn.linear_model as skl
-from mpl_toolkits.mplot3d import Axes3D
+#from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib.ticker import LinearLocator, FormatStrFormatter
@@ -11,11 +11,14 @@ import sklearn.linear_model as skl
 from numpy.linalg import inv
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 import scipy.linalg as scl
+from scipy import stats
+import pandas as pd
 
 
-fig = plt.figure()
-ax = fig.gca(projection='3d')
+#fig = plt.figure()
+#ax = fig.gca(projection='3d')
 # Make data.
+n = 20
 x = np.arange(0, 1, 0.05)
 y = np.arange(0, 1, 0.05)
 
@@ -31,7 +34,7 @@ def FrankeFunction(x,y):
     term4 = -0.2*np.exp(-(9*x-4)**2 - (9*y-7)**2)
     return term1 + term2 + term3 + term4
 
-n = 20
+
 z = FrankeFunction(x, y)+np.random.normal(size=n)
 z = np.ravel(z)	
 
@@ -57,12 +60,21 @@ def CreateDesignMatrix_X(x, y, n ):
 	return X
 
 X = CreateDesignMatrix_X(x,y,2)	
+def beta(X,z):
+	return np.linalg.inv(X.T.dot(X)).dot(X.T.dot(z))
 
+
+"""
+def beta2(X,z):
+	a = X.T.dot(X)
+	#print("a :",a)
+	b = X.T.dot(z)
+	#print("b :",b)
+	return (a*b)**(-1)
+"""
 def OLS_inv(X, z):
-	beta = np.linalg.inv(X.T.dot(X)).dot(X.T.dot(z))	
-	z_tilde = X.dot(beta)
-	
-
+	beta1 = beta(X,z)
+	z_tilde = X.dot(beta1)
 	return z_tilde
 
 #singular value decomposition 
@@ -76,7 +88,7 @@ def check_scikitLearn(X, z):
 	z_tilde = clf.predict(X)
 	return z_tilde
 
-z_tilde = OLS(X,z)
+z_tilde = OLS_inv(X,z)
 
 
 #Error analysis
@@ -90,6 +102,56 @@ def MSE(z, z_tilde):
 def RelativeError(z, z_tilde):
 	return abs((z-z_tilde)/z)
 
+def VarianceBeta(X,z):
+	varZ = np.var(z)
+	return  varZ * (X.T.dot(X))**(-1)
+
+def SDBeta(X,z):
+	return np.sqrt((VarianceBeta(X,z)))
+
+
+####### error bars and plots
+betaArray = np.array(beta(X,z))
+
+zScore = stats.norm.ppf(0.95)
+sdArray = []
+x_value = []
+for i in range(len(betaArray)):
+	Xs = X[:, i]
+	sd = SDBeta(Xs, z)
+	sdArray = np.append(sdArray,sd)
+	x_value = np.append(x_value, i)
+#print(sdArray)
+print(zScore * sdArray/ np.sqrt(X.size))
+yerr =  2*( zScore * sdArray / np.sqrt(X.size))
+print(zScore)
+print(zScore * sdArray / np.sqrt(X.size))
+#xerr = 0.1
+plt.errorbar(x_value,betaArray, yerr,lw=1)
+plt.show()
+
+"""
+def ConfidenceInterval(X,betanr, z, conf):  # n is n*n = 20*20 = 400 in this case
+	b = beta(X, z)[betanr]
+	X = X[:, betanr]
+	sd = SDBeta(X,z)
+	n = len(X)
+	zScore = stats.norm.ppf(conf)
+	#print("zscore: ", zScore)
+	start = b - zScore * sd / np.sqrt(n)
+	end = b + zScore * sd / np.sqrt(n)
+	return start, end
+
+
+
+def printFunctionStats(betanr,precentageOfNormalPDF):
+	p = precentageOfNormalPDF
+	print("Variance of the estimator: ", VarianceBeta(X[:, betanr], z))
+	print("SD of the estimator: ", SDBeta(X[:, betanr], z))
+	s, e = ConfidenceInterval(X, betanr, z, p)
+	print("Confidence interval length", e-s)
+	return
+"""
 print("Variance score R2 code: ", R2(z,z_tilde))
 print("Mean Squared Error code: ", MSE(z, z_tilde))
 #print("Relative Error: ", RelativeError(z, z_tilde))
@@ -100,10 +162,12 @@ print("Mean squared error: %.2f" % mean_squared_error(z, z_tilde))
 print('Variance score: %.2f' % r2_score(z,z_tilde))
 # Mean absolute error                                                           
 print('Mean absolute error: %.2f' % mean_absolute_error(z, z_tilde))
+#printFunctionStats(1, 0.999)
 #print(clf.coef_, clf.intercept_)
+"""
+#VarianceBeta(z,X[0])
 
-
-
+#print(len((X[:, 0])))
  #Plot the surface.
 #surf = ax.plot_surface(x, y, z, cmap=cm.coolwarm,
 #linewidth=0, antialiased=False)
@@ -128,3 +192,4 @@ print('Mean absolute error: %.2f' % mean_absolute_error(z, z_tilde))
 #p = np.poly1d(np.polyfit(x.T, y,2))
 
 
+"""
