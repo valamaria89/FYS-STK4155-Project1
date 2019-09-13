@@ -13,16 +13,17 @@ from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 import scipy.linalg as scl
 from scipy import stats
 import pandas as pd
+from sklearn.model_selection import train_test_split
 
 
 #fig = plt.figure()
 #ax = fig.gca(projection='3d')
 # Make data.
-n = 20
+#n = 40000
 x = np.arange(0, 1, 0.05)
 y = np.arange(0, 1, 0.05)
 
-
+n = x.size
 x, y = np.meshgrid(x,y)
 
 
@@ -37,6 +38,7 @@ def FrankeFunction(x,y):
 
 z = FrankeFunction(x, y)+np.random.normal(size=n)
 z = np.ravel(z)	
+
 
 # def this: 
 def CreateDesignMatrix_X(x, y, n ):
@@ -88,7 +90,7 @@ def check_scikitLearn(X, z):
 	z_tilde = clf.predict(X)
 	return z_tilde
 
-z_tilde = OLS_inv(X,z)
+#z_tilde = OLS_inv(X,z)
 
 
 #Error analysis
@@ -121,14 +123,89 @@ for i in range(len(betaArray)):
 	sd = SDBeta(Xs, z)
 	sdArray = np.append(sdArray,sd)
 	x_value = np.append(x_value, i)
-#print(sdArray)
-print(zScore * sdArray/ np.sqrt(X.size))
+
+#print(zScore * sdArray/ np.sqrt(X.size))
 yerr =  2*( zScore * sdArray / np.sqrt(X.size))
-print(zScore)
-print(zScore * sdArray / np.sqrt(X.size))
+
+
 #xerr = 0.1
-plt.errorbar(x_value,betaArray, yerr,lw=1)
-plt.show()
+#plt.errorbar(x_value,betaArray, yerr,lw=1)
+#plt.show()
+
+############ Error analysis ##################
+"""print("Variance score R2 code: ", R2(z,z_tilde))
+print("Mean Squared Error code: ", MSE(z, z_tilde))
+#print("Relative Error: ", RelativeError(z, z_tilde))
+
+#ScikitLearn Error Analysis
+print("Mean squared error: %.2f" % mean_squared_error(z, z_tilde))
+# Explained variance score: 1 is perfect prediction                                 
+print('Variance score: %.2f' % r2_score(z,z_tilde))
+# Mean absolute error                                                           
+print('Mean absolute error: %.2f' % mean_absolute_error(z, z_tilde))"""
+
+######### Splitting data into train & test ################
+
+"""X_train, X_test, z_train, z_test = train_test_split(X, z, test_size=0.2)
+
+beta = beta(X_train, z_train) # Matrix inversion
+#clf = skl.LinearRegression().fit(X_train, z_train)
+#z_tilde = clf.predict(X_train)
+
+z_tilde = X_train.dot(beta) # Matrix inversion
+
+print("Training R2: ")
+print(R2(z_train, z_tilde))
+print("Training MSE: ")
+print(MSE(z_train, z_tilde))
+
+z_predict = X_test.dot(beta) # Matrix inversion
+#z_predict = clf.predict(X_test)
+print("Test R2 :")
+print(R2(z_test, z_predict))
+print("Test MSE: ")
+print(MSE(z_test, z_predict))
+
+#plt.scatter(z_test, z_predict) #ideally this should be a straight line 
+#plt.show() """
+
+########## Cross validation k-space ##############
+splits = 5
+#X = np.arange(10, 20)
+
+X_k = np.split(X, splits)
+z_k = np.split(z, splits)
+
+#print(z_k)
+MSE_tilde = []
+MSE_predict = []
+for i in range(splits):
+
+	X_train = X_k
+	z_train = z_k
+	
+
+	
+	X_test = X_k[i]
+	X_train = np.delete(X_train, i , 0)
+	X_train = np.concatenate(X_train)
+	z_test = z_k[i]
+	z_train = np.delete(z_train, i , 0)
+	z_train = np.ravel(z_train)
+	#print(X_train)
+	#print(z_train.size)
+	
+	beta = np.linalg.inv(X.T.dot(X)).dot(X.T.dot(z))
+	z_tilde = X_train.dot(beta)
+	z_predict = X_test.dot(beta)
+	
+	MSE_tilde_i = MSE(z_train, z_tilde)
+	MSE_predict_i = MSE(z_test, z_predict)
+	MSE_tilde = np.append(MSE_tilde, MSE_tilde_i)
+	MSE_predict = np.append(MSE_predict, MSE_predict_i)
+
+print(MSE_tilde)	
+print(MSE_predict)
 
 """
 def ConfidenceInterval(X,betanr, z, conf):  # n is n*n = 20*20 = 400 in this case
@@ -152,16 +229,7 @@ def printFunctionStats(betanr,precentageOfNormalPDF):
 	print("Confidence interval length", e-s)
 	return
 """
-print("Variance score R2 code: ", R2(z,z_tilde))
-print("Mean Squared Error code: ", MSE(z, z_tilde))
-#print("Relative Error: ", RelativeError(z, z_tilde))
 
-#ScikitLearn Error Analysis
-print("Mean squared error: %.2f" % mean_squared_error(z, z_tilde))
-# Explained variance score: 1 is perfect prediction                                 
-print('Variance score: %.2f' % r2_score(z,z_tilde))
-# Mean absolute error                                                           
-print('Mean absolute error: %.2f' % mean_absolute_error(z, z_tilde))
 #printFunctionStats(1, 0.999)
 #print(clf.coef_, clf.intercept_)
 """
