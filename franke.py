@@ -5,15 +5,20 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib.ticker import LinearLocator, FormatStrFormatter
 from random import random, seed
+
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
 import sklearn.linear_model as skl
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import KFold
+from sklearn.model_selection import cross_val_score
+
 from numpy.linalg import inv
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 import scipy.linalg as scl
 from scipy import stats
 import pandas as pd
-from sklearn.model_selection import train_test_split
+
 
 
 #fig = plt.figure()
@@ -173,40 +178,62 @@ print(MSE(z_test, z_predict))
 splits = 5
 #X = np.arange(10, 20)
 
-X_k = np.split(X, splits)
-z_k = np.split(z, splits)
 
-#print(z_k)
-MSE_tilde = []
-MSE_predict = []
-for i in range(splits):
 
-	X_train = X_k
-	z_train = z_k
-	
+def Kfold_hm(X,z):
 
-	
-	X_test = X_k[i]
-	X_train = np.delete(X_train, i , 0)
-	X_train = np.concatenate(X_train)
-	z_test = z_k[i]
-	z_train = np.delete(z_train, i , 0)
-	z_train = np.ravel(z_train)
-	#print(X_train)
-	#print(z_train.size)
-	
-	beta = np.linalg.inv(X.T.dot(X)).dot(X.T.dot(z))
-	z_tilde = X_train.dot(beta)
-	z_predict = X_test.dot(beta)
-	
-	MSE_tilde_i = MSE(z_train, z_tilde)
-	MSE_predict_i = MSE(z_test, z_predict)
-	MSE_tilde = np.append(MSE_tilde, MSE_tilde_i)
-	MSE_predict = np.append(MSE_predict, MSE_predict_i)
 
-print(MSE_tilde)	
-print(MSE_predict)
+	#for i in range(X.shape[1] - 1): # tror denne randomiserer feil(posisjonene) og er unødvendig
+		#random.shuffle(X[:, i])
 
+	X_k = np.split(X, splits)
+	z_k = np.split(z, splits)
+
+
+	MSE_train = []
+	MSE_test = []
+	for i in range(splits):
+
+		X_train = X_k
+		X_train = np.delete(X_train, i, 0)
+		X_train = np.concatenate(X_train)
+
+		z_train = z_k
+		z_train = np.delete(z_train, i, 0)
+		z_train = np.ravel(z_train)
+
+		X_test = X_k[i]
+		z_test = z_k[i]
+
+
+		beta_train = np.linalg.inv(X_train.T.dot(X_train)).dot(X_train.T.dot(z_train))
+		beta_test = np.linalg.inv(X_test.T.dot(X_test)).dot(X_test.T.dot(z_test))
+		z_tilde = X_train.dot(beta_train)
+		z_predict = X_test.dot(beta_test)
+
+		MSE_train_i = MSE(z_tilde, z_train)
+		MSE_test_i = MSE(z_predict, z_test)
+
+		MSE_train = np.append(MSE_train, MSE_train_i)
+		MSE_test = np.append(MSE_test, MSE_test_i)
+	return MSE_test, MSE_train
+MSE_test, MSE_train = Kfold_hm(X,z)
+
+print(MSE_train)
+print(MSE_test)
+MSE_train_mean = np.mean(MSE_train,axis=0)
+MSE_test_mean = np.mean(MSE_test,axis=0)
+
+kfold = KFold(n_splits=splits,shuffle=True)
+
+clf = skl.LinearRegression().fit(X, z)
+estimated_mse_sklearn = cross_val_score(clf,X,z, scoring="neg_mean_squared_error",cv=kfold)
+estimated_mse_sklearn = np.mean(-estimated_mse_sklearn)
+
+
+print("MSE Scikit.Learn: ", estimated_mse_sklearn)
+print("MSE train mean: ", MSE_train_mean)
+print("MSE test mean: ", MSE_test_mean)
 """
 def ConfidenceInterval(X,betanr, z, conf):  # n is n*n = 20*20 = 400 in this case
 	b = beta(X, z)[betanr]
