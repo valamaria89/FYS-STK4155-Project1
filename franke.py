@@ -20,11 +20,6 @@ from scipy import stats
 import pandas as pd
 
 
-
-#fig = plt.figure()
-#ax = fig.gca(projection='3d')
-# Make data.
-#n = 40000
 x = np.arange(0, 1, 0.05)
 y = np.arange(0, 1, 0.05)
 
@@ -66,19 +61,10 @@ def CreateDesignMatrix_X(x, y, n ):
 
 	return X
 
-X = CreateDesignMatrix_X(x,y,2)	
+X = CreateDesignMatrix_X(x,y,0)
 def beta(X,z):
 	return np.linalg.inv(X.T.dot(X)).dot(X.T.dot(z))
 
-
-"""
-def beta2(X,z):
-	a = X.T.dot(X)
-	#print("a :",a)
-	b = X.T.dot(z)
-	#print("b :",b)
-	return (a*b)**(-1)
-"""
 def OLS_inv(X, z):
 	beta1 = beta(X,z)
 	z_tilde = X.dot(beta1)
@@ -117,25 +103,26 @@ def SDBeta(X,z):
 	return np.sqrt((VarianceBeta(X,z)))
 
 
-####### error bars and plots
-betaArray = np.array(beta(X,z))
+def ErrorBars(X,z):
+	####### error bars and plots
+	betaArray = np.array(beta(X,z))
 
-zScore = stats.norm.ppf(0.95)
-sdArray = []
-x_value = []
-for i in range(len(betaArray)):
-	Xs = X[:, i]
-	sd = SDBeta(Xs, z)
-	sdArray = np.append(sdArray,sd)
-	x_value = np.append(x_value, i)
+	zScore = stats.norm.ppf(0.95)
+	sdArray = []
+	x_value = []
+	for i in range(len(betaArray)):
+		Xs = X[:, i]
+		sd = SDBeta(Xs, z)
+		sdArray = np.append(sdArray,sd)
+		x_value = np.append(x_value, i)
 
-#print(zScore * sdArray/ np.sqrt(X.size))
-yerr =  2*( zScore * sdArray / np.sqrt(X.size))
+	#print(zScore * sdArray/ np.sqrt(X.size))
+	yerr =  2*( zScore * sdArray / np.sqrt(X.size))
 
 
-#xerr = 0.1
-#plt.errorbar(x_value,betaArray, yerr,lw=1)
-#plt.show()
+	#xerr = 0.1
+	plt.errorbar(x_value,betaArray, yerr,lw=1)
+	plt.show()
 
 ############ Error analysis ##################
 """print("Variance score R2 code: ", R2(z,z_tilde))
@@ -183,9 +170,6 @@ splits = 5
 def Kfold_hm(X,z):
 
 
-	#for i in range(X.shape[1] - 1): # tror denne randomiserer feil(posisjonene) og er unødvendig
-		#random.shuffle(X[:, i])
-
 	X_k = np.split(X, splits)
 	z_k = np.split(z, splits)
 
@@ -217,23 +201,60 @@ def Kfold_hm(X,z):
 		MSE_train = np.append(MSE_train, MSE_train_i)
 		MSE_test = np.append(MSE_test, MSE_test_i)
 	return MSE_test, MSE_train
-MSE_test, MSE_train = Kfold_hm(X,z)
-
-print(MSE_train)
-print(MSE_test)
-MSE_train_mean = np.mean(MSE_train,axis=0)
-MSE_test_mean = np.mean(MSE_test,axis=0)
-
-kfold = KFold(n_splits=splits,shuffle=True)
-
-clf = skl.LinearRegression().fit(X, z)
-estimated_mse_sklearn = cross_val_score(clf,X,z, scoring="neg_mean_squared_error",cv=kfold)
-estimated_mse_sklearn = np.mean(-estimated_mse_sklearn)
 
 
-print("MSE Scikit.Learn: ", estimated_mse_sklearn)
-print("MSE train mean: ", MSE_train_mean)
-print("MSE test mean: ", MSE_test_mean)
+def MSE_Mean_Kfold(X,z):
+
+	#Home made Kfold-MSE-mean
+	MSE_test, MSE_train = Kfold_hm(X, z)
+	MSE_train_mean = np.mean(MSE_train,axis=0)
+	MSE_test_mean = np.mean(MSE_test,axis=0)
+
+	#Scikit K-fold-MSE-mean
+	kfold = KFold(n_splits=splits,shuffle=True)
+	clf = skl.LinearRegression().fit(X, z)
+	estimated_mse_sklearn = cross_val_score(clf,X,z, scoring="neg_mean_squared_error",cv=kfold)
+	estimated_mse_sklearn = np.mean(-estimated_mse_sklearn)
+
+	#print("MSE Scikit.Learn: ", estimated_mse_sklearn)
+	#print("MSE train mean: ", MSE_train_mean)
+	#print("MSE test mean: ", MSE_test_mean)
+
+	return estimated_mse_sklearn, MSE_train_mean, MSE_test_mean
+
+
+def Plot_nthPoly_MSE_Mean(z,p): # p is max polynominal
+	MSE_train_mean = []
+	MSE_test_mean = []
+	MSE_sci = []
+
+	complex = np.arange(0,p+1)
+	for i in range(p+1):
+
+		X = CreateDesignMatrix_X(x, y, i) # Using the mesh x,y defined on the top
+		MSE_train_mean_i = MSE_Mean_Kfold(X,z)[1]
+		MSE_test_mean_i = MSE_Mean_Kfold(X,z)[2]
+		MSE_sci_i = MSE_Mean_Kfold(X,z)[0]
+
+		MSE_train_mean = np.append(MSE_train_mean, MSE_train_mean_i)
+		MSE_test_mean = np.append(MSE_test_mean, MSE_test_mean_i)
+		MSE_sci = np.append(MSE_sci, MSE_sci_i)
+
+	print(MSE_train_mean)
+	print(MSE_test_mean)
+	#print(MSE_sci)
+
+	plt.plot(complex, MSE_train_mean)
+	plt.plot(complex, MSE_test_mean)
+	plt.plot(complex, MSE_sci)
+
+	plt.legend(['MSE train mean','MSE test mean', 'MSE sci'], loc='upper left')
+
+	plt.show()
+
+Plot_nthPoly_MSE_Mean(z,10)
+
+
 """
 def ConfidenceInterval(X,betanr, z, conf):  # n is n*n = 20*20 = 400 in this case
 	b = beta(X, z)[betanr]
