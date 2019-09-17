@@ -1,5 +1,6 @@
 import numpy as np 
 import sklearn.linear_model as skl
+#import sklearn.linear_model as Ridge
 #from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 from matplotlib import cm
@@ -61,7 +62,8 @@ def CreateDesignMatrix_X(x, y, n ):
 
 	return X
 
-X = CreateDesignMatrix_X(x,y,0)
+X = CreateDesignMatrix_X(x,y,2)
+
 def beta(X,z):
 	return np.linalg.inv(X.T.dot(X)).dot(X.T.dot(z))
 
@@ -70,10 +72,17 @@ def OLS_inv(X, z):
 	z_tilde = X.dot(beta1)
 	return z_tilde
 
+
 #singular value decomposition 
-def ols_svd(x: np.ndarray, y: np.ndarray) -> np.ndarray:
+def OLS_svd(x: np.ndarray, y: np.ndarray) -> np.ndarray:
+	#Gives the betas for the SVD 
     u, s, v = scl.svd(x)
     return v.T @ scl.pinv(scl.diagsvd(s, u.shape[0], v.shape[0])) @ u.T @ y
+
+
+
+#print("z_OLS_inv: ", z_OLS_inv)
+#print("beta_svd: ", beta_SVD)
 
 #check against scikitLearn : 
 def check_scikitLearn(X, z):
@@ -165,11 +174,17 @@ print(MSE(z_test, z_predict))
 splits = 5
 #X = np.arange(10, 20)
 
+def Ridge_hm(X, z, lamb):
+	beta_ridgeSVD = OLS_svd(X, z)*(1+lamb)**(-1)
+		#z_tilde = X_train.dot(beta_ridgeSVD)
+		#MSE_ridge_lmb = MSE(z, z_tilde)
+		#MSE_ridge = np.append(MSE_ridge, MSE_ridge_lmb)
 
+	return beta_ridgeSVD
+#print(Ridge_hm(X,Z, 1))
 
-def Kfold_hm(X,z):
-
-
+def Kfold_hm(X,z, lamb):
+	#Model tells us if we are using OLS or SVD-Ridge or Lasso
 	X_k = np.split(X, splits)
 	z_k = np.split(z, splits)
 
@@ -189,11 +204,15 @@ def Kfold_hm(X,z):
 		X_test = X_k[i]
 		z_test = z_k[i]
 
+		if (lamb == 0):
+			beta_train = np.linalg.inv(X_train.T.dot(X_train)).dot(X_train.T.dot(z_train))
+		
+		else:
+			beta_train = Ridge_hm(X_train, z_train,lamb)
 
-		beta_train = np.linalg.inv(X_train.T.dot(X_train)).dot(X_train.T.dot(z_train))
-		beta_test = np.linalg.inv(X_test.T.dot(X_test)).dot(X_test.T.dot(z_test))
+		#beta_test = np.linalg.inv(X_test.T.dot(X_test)).dot(X_test.T.dot(z_test))
 		z_tilde = X_train.dot(beta_train)
-		z_predict = X_test.dot(beta_test)
+		z_predict = X_test.dot(beta_train)
 
 		MSE_train_i = MSE(z_tilde, z_train)
 		MSE_test_i = MSE(z_predict, z_test)
@@ -202,11 +221,15 @@ def Kfold_hm(X,z):
 		MSE_test = np.append(MSE_test, MSE_test_i)
 	return MSE_test, MSE_train
 
+#MSE_test, MSE_train = Kfold_hm(X,z)
 
-def MSE_Mean_Kfold(X,z):
+#print("MSE test: ", MSE_test)
+#print("MSE train: ", MSE_train)
+
+def MSE_Mean_Kfold(X,z, lamb):
 
 	#Home made Kfold-MSE-mean
-	MSE_test, MSE_train = Kfold_hm(X, z)
+	MSE_test, MSE_train = Kfold_hm(X, z, lamb)
 	MSE_train_mean = np.mean(MSE_train,axis=0)
 	MSE_test_mean = np.mean(MSE_test,axis=0)
 
@@ -223,6 +246,26 @@ def MSE_Mean_Kfold(X,z):
 	return estimated_mse_sklearn, MSE_train_mean, MSE_test_mean
 
 
+def scikitLearn_Ridge(X, z, nlambdas, lambdas):
+
+## Cross-validation with scikitlearn and Ridge with k folds
+	poly = PolynomialFeatures(degree = 2)
+	k = 5
+	kfold = KFold(n_splits = k)
+	
+
+	estimated_mse_sklearn = np.zeros(nlambdas)
+	i = 0
+	for lmb in lambdas:
+		ridge = skl.Ridge(alpha = lmb)
+		#X = poly.fit_transform(x[:, np.newaxis])
+		estimated_mse_folds = cross_val_score(ridge, X, z[:, np.newaxis],scoring='neg_mean_squared_error', cv=kfold)
+		estimated_mse_sklearn[i] = np.mean(-estimated_mse_folds)
+
+		i += 1
+
+	return estimated_mse_sklearn
+
 def Plot_nthPoly_MSE_Mean(z,p): # p is max polynominal
 	MSE_train_mean = []
 	MSE_test_mean = []
@@ -232,16 +275,16 @@ def Plot_nthPoly_MSE_Mean(z,p): # p is max polynominal
 	for i in range(p+1):
 
 		X = CreateDesignMatrix_X(x, y, i) # Using the mesh x,y defined on the top
-		MSE_train_mean_i = MSE_Mean_Kfold(X,z)[1]
-		MSE_test_mean_i = MSE_Mean_Kfold(X,z)[2]
-		MSE_sci_i = MSE_Mean_Kfold(X,z)[0]
+		MSE_train_mean_i = MSE_Mean_Kfold(X,z,0)[1]
+		MSE_test_mean_i = MSE_Mean_Kfold(X,z,0)[2]
+		MSE_sci_i = MSE_Mean_Kfold(X,z,0)[0]
 
 		MSE_train_mean = np.append(MSE_train_mean, MSE_train_mean_i)
 		MSE_test_mean = np.append(MSE_test_mean, MSE_test_mean_i)
 		MSE_sci = np.append(MSE_sci, MSE_sci_i)
 
-	print(MSE_train_mean)
-	print(MSE_test_mean)
+	#print(MSE_train_mean)
+	#print(MSE_test_mean)
 	#print(MSE_sci)
 
 	plt.plot(complex, MSE_train_mean)
@@ -252,8 +295,44 @@ def Plot_nthPoly_MSE_Mean(z,p): # p is max polynominal
 
 	plt.show()
 
-Plot_nthPoly_MSE_Mean(z,10)
+# This function plots the mean of k-folds MSE with respect to different lambdas, with given poly degree	
+def Plot_nthLambda_MSE_Mean(z,p,nlambdas):
+	MSE_train_mean = []
+	MSE_test_mean = []
+	#MSE_sci = []
+	X = CreateDesignMatrix_X(x,y,p)
+	lambdas = np.logspace(-3, 5, nlambdas)
+	for l in lambdas:
+		#ridge = Ridge(alpha=l)
+		MSE_train_mean_i = MSE_Mean_Kfold(X,z,l)[1]
+		MSE_test_mean_i = MSE_Mean_Kfold(X,z,l)[2]
 
+		MSE_train_mean = np.append(MSE_train_mean, MSE_train_mean_i)
+		MSE_test_mean = np.append(MSE_test_mean, MSE_test_mean_i)
+
+	estimated_mse_sklearn = scikitLearn_Ridge(X,z, nlambdas, lambdas)	
+	plt.plot(np.log10(lambdas), MSE_train_mean)
+	plt.plot(np.log10(lambdas), MSE_test_mean)
+	plt.plot(np.log10(lambdas), estimated_mse_sklearn, label= "cross_val_score")
+	#plt.plot(complex, MSE_sci)
+
+	plt.legend(['MSE train mean','MSE test mean', 'MSE Scikit'], loc='upper left')
+	plt.xlabel("log10(lambda)")
+	plt.ylabel("mse")
+	plt.show()
+
+Plot_nthLambda_MSE_Mean(z,2, 500)
+
+
+
+#estimated_mse_sklearn = scikitLearn_Ridge(X,z)
+#print(scikitLearn_Ridge(X, z))
+#plt.figure()
+#plt.plot(np.log10(lambdas), estimated_mse_sklearn, label= "cross_val_score")
+
+
+#plt.legend()
+#plt.show()
 
 """
 def ConfidenceInterval(X,betanr, z, conf):  # n is n*n = 20*20 = 400 in this case
