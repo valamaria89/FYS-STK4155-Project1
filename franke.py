@@ -243,6 +243,26 @@ def MSE_Mean_Kfold(X,z, lamb):
 
 	return estimated_mse_sklearn, MSE_train_mean, MSE_test_mean
 
+def scikitLearn_Lasso(X, z, nlambdas):
+	k = 5
+	kfold = KFold(n_splits = k)
+	lambdas = np.logspace(-3, 5, nlambdas)
+
+	estimated_mse_sklearn = np.zeros(nlambdas)
+	i = 0
+	for lmb in lambdas:
+		model_lasso = skl.Lasso(alpha=lambdas)
+		model_lasso.fit(X,z)
+		X = model_lasso.predict(X)
+		estimated_mse_folds = cross_val_score(model_lasso, X, z,scoring='neg_mean_squared_error', cv=kfold)
+		estimated_mse_sklearn[i] = np.mean(-estimated_mse_folds)
+
+		i += 1
+
+	return estimated_mse_sklearn
+
+print(scikitLearn_Lasso(X,z, 1))
+
 
 def scikitLearn_Ridge(X, z, nlambdas, lambdas):
 
@@ -256,7 +276,7 @@ def scikitLearn_Ridge(X, z, nlambdas, lambdas):
 	i = 0
 	for lmb in lambdas:
 		ridge = skl.Ridge(alpha = lmb)
-		#X = poly.fit_transform(x[:, np.newaxis])
+		X = poly.fit_transform(x)
 		estimated_mse_folds = cross_val_score(ridge, X, z,scoring='neg_mean_squared_error', cv=kfold)
 		estimated_mse_sklearn[i] = np.mean(-estimated_mse_folds)
 
@@ -308,13 +328,15 @@ def Plot_nthLambda_MSE_Mean(z,p,nlambdas):
 		MSE_train_mean = np.append(MSE_train_mean, MSE_train_mean_i)
 		MSE_test_mean = np.append(MSE_test_mean, MSE_test_mean_i)
 
-	estimated_mse_sklearn = scikitLearn_Ridge(X,z, nlambdas, lambdas)	
+	estimated_mse_sklearn_ridge = scikitLearn_Ridge(X,z, nlambdas, lambdas)
+	#estimated_mse_sklearn_lasso = scikitLearn_Lasso(X, z, nlambdas, lambdas)
 	plt.plot(np.log10(lambdas), MSE_train_mean)
 	plt.plot(np.log10(lambdas), MSE_test_mean)
-	plt.plot(np.log10(lambdas), estimated_mse_sklearn, label= "cross_val_score")
+	plt.plot(np.log10(lambdas), estimated_mse_sklearn_ridge)
+	plt.plot(np.log10(lambdas), estimated_mse_sklearn_lasso)
 	#plt.plot(complex, MSE_sci)
 
-	plt.legend(['MSE train mean','MSE test mean', 'MSE Scikit'], loc='upper left')
+	plt.legend(['MSE train mean','MSE test mean', 'MSE SK Ridge', "MSE SK Lasso"], loc='upper left')
 	plt.xlabel("log10(lambda)")
 	plt.ylabel("mse")
 	plt.show()
