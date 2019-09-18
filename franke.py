@@ -175,13 +175,11 @@ splits = 5
 #X = np.arange(10, 20)
 
 def Ridge_hm(X, z, lamb):
-	beta_ridgeSVD = OLS_svd(X, z)*(1+lamb)**(-1)
-		#z_tilde = X_train.dot(beta_ridgeSVD)
-		#MSE_ridge_lmb = MSE(z, z_tilde)
-		#MSE_ridge = np.append(MSE_ridge, MSE_ridge_lmb)
+	I = np.identity(X.shape[1])
+	beta_ridgeOLS = np.linalg.inv(X.T.dot(X) +lamb*I).dot(X.T.dot(z)) 
+	
+	return beta_ridgeOLS
 
-	return beta_ridgeSVD
-#print(Ridge_hm(X,Z, 1))
 
 def Kfold_hm(X,z, lamb):
 	#Model tells us if we are using OLS or SVD-Ridge or Lasso
@@ -259,7 +257,7 @@ def scikitLearn_Ridge(X, z, nlambdas, lambdas):
 	for lmb in lambdas:
 		ridge = skl.Ridge(alpha = lmb)
 		#X = poly.fit_transform(x[:, np.newaxis])
-		estimated_mse_folds = cross_val_score(ridge, X, z[:, np.newaxis],scoring='neg_mean_squared_error', cv=kfold)
+		estimated_mse_folds = cross_val_score(ridge, X, z,scoring='neg_mean_squared_error', cv=kfold)
 		estimated_mse_sklearn[i] = np.mean(-estimated_mse_folds)
 
 		i += 1
