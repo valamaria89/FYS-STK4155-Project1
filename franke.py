@@ -64,6 +64,7 @@ def CreateDesignMatrix_X(x, y, n ):
 
 X = CreateDesignMatrix_X(x,y,2)
 
+
 def beta(X,z):
     return np.linalg.inv(X.T.dot(X)).dot(X.T.dot(z))
 
@@ -251,7 +252,7 @@ def scikitLearn_Lasso(X, z, nlambdas, lambdas):
     estimated_mse_sklearn = np.zeros(nlambdas)
     i = 0
     for lmb in lambdas:
-        model_lasso = skl.Lasso(alpha=lmb)
+        model_lasso = skl.Lasso(alpha=lmb, fit_intercept=False, normalize=True)
         #lasso = linear_model.Lasso()
         #model_lasso.fit(X,z)
         #X = model_lasso.predict(X)
@@ -271,17 +272,34 @@ def scikitLearn_Ridge(X, z, nlambdas, lambdas):
     k = 5
     kfold = KFold(n_splits = k)
 
+   # X = X - np.mean(X,axis=0)
+    #poly = PolynomialFeatures(degree = 0)
     estimated_mse_sklearn = np.zeros(nlambdas)
     i = 0
     for lmb in lambdas:
-        ridge = skl.Ridge(alpha = lmb)
-        #X = poly.fit_transform(x)
+        ridge = skl.Ridge(alpha = lmb, fit_intercept=False, normalize=True)
+        #X = poly.fit_transform(x[:, np.newaxis])
+        #print(X.size)
         estimated_mse_folds = cross_val_score(ridge, X, z,scoring='neg_mean_squared_error', cv=kfold)
         estimated_mse_sklearn[i] = np.mean(-estimated_mse_folds)
 
         i += 1
 
+
     return estimated_mse_sklearn
+
+
+"""nlambdas = 500
+lambdas = np.logspace(-3, 5, nlambdas)
+estimated_mse_sklearn = scikitLearn_Ridge(x,z, nlambdas, lambdas)
+
+plt.plot(np.log10(lambdas), estimated_mse_sklearn, label = 'cross_val_score')
+plt.xlabel('log10(lambda)')
+plt.ylabel('mse')
+
+plt.legend()
+
+plt.show()"""
 
 def Plot_nthPoly_MSE_Mean(z,p): # p is max polynominal
     MSE_train_mean = []
@@ -335,12 +353,12 @@ def Plot_nthLambda_MSE_Mean(z,p,nlambdas):
     plt.plot(np.log10(lambdas), estimated_mse_sklearn_lasso)
     #plt.plot(complex, MSE_sci)
 
-    plt.legend(['MSE train mean','MSE test mean', 'MSE SK Ridge', "MSE SK Lasso"], loc='upper left')
+    plt.legend(['MSE train mean_ridge','MSE test mean_ridge', 'MSE SK Ridge', "MSE SK Lasso"], loc='upper left')
     plt.xlabel("log10(lambda)")
     plt.ylabel("mse")
     plt.show()
 
-Plot_nthLambda_MSE_Mean(z,3, 500)
+Plot_nthLambda_MSE_Mean(z,0, 500)
 
 
 
