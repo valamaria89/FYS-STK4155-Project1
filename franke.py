@@ -46,6 +46,8 @@ np.random.seed(seed)
 noise = np.random.randn(z.shape[0])
 z += noise
 
+print(z)
+
 
 # def this: 
 def CreateDesignMatrix_X(x, y, n ):
@@ -68,11 +70,11 @@ def CreateDesignMatrix_X(x, y, n ):
 
     return X
 
-X = CreateDesignMatrix_X(x,y,2)
+X = CreateDesignMatrix_X(x,y,4)
 
 
 def beta(X,z):
-    return np.linalg.inv(X.T.dot(X)).dot(X.T.dot(z))
+    return np.linalg.pinv(X.T.dot(X)).dot(X.T.dot(z))
 
 def OLS_inv(X, z):
     beta1 = beta(X,z)
@@ -102,7 +104,7 @@ def check_scikitLearn(X, z):
 
 #Error analysis
 def R2(z, z_tilde):
-    return 1- np.sum((z-z_tilde)**2)/np.sum((z-np.mean(z_tilde))**2)
+    return 1- np.sum((z-z_tilde)**2)/np.sum((z-np.mean(z))**2)
 
 def MSE(z, z_tilde):
     n = np.size(z_tilde)
@@ -132,13 +134,12 @@ def ErrorBars(X,z):
     sdArray = SDBeta(X, z)
         
     x_value = np.arange(len(betaArray))
-
-    #print(zScore * sdArray/ np.sqrt(X.size))
-    yerr =  2*( zScore * sdArray / np.sqrt(X.size))
+    yerr =  ( zScore * sdArray) # np.sqrt(X.shape[0]))
+    #yerr = sdArray
 
 
     #xerr = 0.1
-    plt.errorbar(x_value,betaArray, yerr,lw=1)
+    plt.errorbar(x_value,betaArray, yerr,lw=1,linestyle=':',marker='o')
     plt.show()
 
 ############ Error analysis ##################
@@ -177,9 +178,9 @@ def Train_Test_OLS(X,z):
     print("Test MSE: ")
     print(MSE(z_test, z_predict))
 
-    plt.scatter(z_test, z_predict) #ideally this should be a straight line 
+    plt.scatter(z_test, z_predict) #ideally this should be a straight line
     plt.show()
-
+Train_Test_OLS(X,z)
 ########## Cross validation k-space ##############
 splits = 5
 #X = np.arange(10, 20)
@@ -445,8 +446,8 @@ def Plot_VarBias_nthpoly(z,p):
 #Plot_VarBias_nthpoly(z,10)
 
 
-Plot_nthLambda_MSE_Mean(z,2, 500)
-#Plot_nthPoly_MSE_Mean(z,5)
+#Plot_nthLambda_MSE_Mean(z,2, 500)
+Plot_nthPoly_MSE_Mean(z,15)
 
 
 #estimated_mse_sklearn = scikitLearn_Ridge(X,z)
