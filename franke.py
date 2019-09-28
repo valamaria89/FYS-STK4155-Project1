@@ -47,7 +47,7 @@ z += noise
 print(z)
 
 
-# def this: 
+# def this:
 def CreateDesignMatrix_X(x, y, n):
     """
     Function for creating a design X-matrix with rows [1, x, y, x^2, xy, xy^2 , etc.]
