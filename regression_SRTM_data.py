@@ -107,8 +107,8 @@ def Kfold(X, z, lamb = 0, error ='MSE'):
     z_k = np.split(z_shuffled, splits)
 
 
-    MSE_train = []
-    MSE_test = []
+    MSE_train = np.zeros((splits))
+    MSE_test = np.zeros((splits))
     for i in range(splits):
 
         X_train = X_k
@@ -125,11 +125,9 @@ def Kfold(X, z, lamb = 0, error ='MSE'):
 
         z_tilde = X_train.dot(beta_train)
         z_predict = X_test.dot(beta_train)
-        MSE_train_i = ErrorAnalysis(z_train, z_tilde, error='MSE')
-        MSE_test_i = ErrorAnalysis(z_test, z_predict, error='MSE')
 
-        MSE_train = np.append(MSE_train, MSE_train_i)
-        MSE_test = np.append(MSE_test, MSE_test_i)
+        MSE_train[i] = ErrorAnalysis(z_train, z_tilde, error='MSE')
+        MSE_test[i] = ErrorAnalysis(z_test, z_predict, error='MSE')
 
     MSE_train_mean = np.mean(MSE_train,axis=0)
     MSE_test_mean = np.mean(MSE_test,axis=0)
