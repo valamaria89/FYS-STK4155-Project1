@@ -1,6 +1,7 @@
 import numpy as np
 from imageio import imread
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 from matplotlib.ticker import LinearLocator, FormatStrFormatter
@@ -8,12 +9,14 @@ from sklearn.preprocessing import PolynomialFeatures
 import random
 from scipy import stats
 import platform
+from cycler import cycler
 platform.architecture()
 
 from sklearn.model_selection import KFold
 from sklearn.model_selection import cross_val_score
 import sklearn.linear_model as skl
 
+colors = ['#1f77b4', '#1f77b4', '#aec7e8','#aec7e8','#ff7f0e','#ff7f0e','#d62728','#d62728','#2ca02c','#2ca02c','#98df8a','#98df8a','#ffbb78','#ffbb78']
 # Load the terrain
 terrain = imread('SRTM_Oslo_Fjorden.tif')
 #terrain = imread('SRTM_Norway_1.tif')
@@ -27,13 +30,13 @@ terrain = imread('SRTM_Oslo_Fjorden.tif')
 #plt.show()
 
 
-seed = 2000
+seed = 206
 maxValue = np.amax(terrain)
 random.seed(seed)
 
 ### Global variables
-y_size = 100
-x_size = 100
+y_size = 20
+x_size = 20
 x = np.linspace(0, 1, x_size)
 y = np.linspace(0, 1, y_size)
 x, y = np.meshgrid(x, y)
@@ -141,72 +144,159 @@ def Kfold(X, z, lamb = 0, error ='MSE'):
 def Regression(z, p = 3,lamb = 0, model = 'OLS', resampling = 'kfold', error ='MSE'):
     X = CreateDesignMatrix(x,y,p)
 
-
-
     if (model == 'OLS' or model == 'Ridge'):
         if model == 'OLS': lamb = 0
-        beta_OLS = beta(X, z, lamb)
-        z_tilde = X.dot(beta_OLS)
-        if resampling == 'None':
+        betas = beta(X, z, lamb)
+        print("Betas: ", betas)
+        print("polynomial: ", p, " Determinant: ", np.linalg.det(X.T.dot(X)))
+        z_tilde = X.dot(betas)
+
+        if resampling == 'none':
             Error = ErrorAnalysis(z, z_tilde, error)
-            return Error, beta, z_tilde
+            return Error, betas, z_tilde
         elif resampling == 'kfold':
             return Kfold(X,z, lamb)
 
-    if model == 'Lasso':
-        if resampling == 'None':
-            I = np.identity(X.shape[1])
-            beta_Ridge = beta(X,z,lamb)
-            z_tilde = X.dot(beta_Ridge)
-            return beta_ridge, z_tilde
-        if resampling == 'bootstrap':
-            return
+    if model == 'Lasso':  # Here we used scikit learn
+        if error != 'MSE': error = 'MSE' and print('only MSE available')
+        model_lasso = skl.Lasso(alpha=lamb, fit_intercept=False, normalize=True,tol=0.01)
+
+        if resampling == 'none':
+            model_lasso.fit(X,z)
+            betas = model_lasso.coef_
+            z_tilde = X.dot(betas)
+            Error = ErrorAnalysis(z,z_tilde, error)
+            return Error, betas, z_tilde
+        elif resampling == 'kfold':
+            splits = 5
+            k_fold = KFold(n_splits=splits, shuffle=True, random_state=seed)
+            return np.mean(-(cross_val_score(model_lasso, X, z, scoring='neg_mean_squared_error', cv=k_fold)))
     return
 
-def plotting(z, p = 3, lamb = 0, model = 'OLS', resampling = 'kfold', error = 'MSE', plot = 'polynomial plot'):
+def plotting(z, p = 3, lamb = 0, model = 'OLS', resampling = 'kfold', error = 'MSE', plot = 'polynomial'):
     complexity = np.arange(0, p + 1)
-    if plot == 'polynomial plot':
+    if plot == 'polynomial':
 
         if error == 'MSE':
-            MSE_train_array = np.zeros(p+1)
-            MSE_test_array = np.zeros(p+1)
-            for p in range(p+1):
-                MSE_train_array[p], MSE_test_array[p] = Regression(z, p, lamb, model, resampling, error)[0:2]
-            plt.xlabel('Model Complexity')
-            plt.ylabel('Prediction Error (MSE)')
-            plt.plot(complexity, MSE_train_array)
-            plt.plot(complexity, MSE_test_array)
-            plt.legend(['Train sample', 'Test sample'], loc='upper left')
-            plt.show()
+            if resampling == 'kfold':
+
+                MSE_train_array = np.zeros(p+1)
+                MSE_test_array = np.zeros(p+1)
+                for p in range(p+1):
+                    MSE_train_array[p], MSE_test_array[p] = Regression(z, p, lamb, model, resampling, error)[0:2]
+                plt.xlabel('Model Complexity')
+                plt.ylabel('Prediction Error (MSE)')
+                plt.plot(complexity, MSE_train_array)
+                plt.plot(complexity, MSE_test_array)
+                plt.legend(['Train sample', 'Test sample'], loc='upper left')
+                plt.show()
+            elif resampling == 'none':
+
+                MSE_array = np.zeros(p+1)
+                for p in range(p+1):
+                    MSE_array[p] = Regression(z, p, lamb, model, resampling = 'none', error = 'MSE')[0]
+                plt.xlabel('Model Complexity')
+                plt.ylabel('Prediction Error (MSE)')
+                plt.plot(complexity, MSE_array)
+                plt.legend(['Sample with no cross validation'], loc='upper left')
+                plt.show()
 
         if error == 'R2':
+
             R2_array = np.zeros(p+1)
             for p in range(p+1):
-                R2_array[p] = Regression(z, p, resampling = 'None', error = 'R2')[0]
+                R2_array[p] = Regression(z, p, resampling = 'none', error = 'R2')[0]
             plt.xlabel('Model Complexity')
             plt.ylabel('R2')
             plt.plot(complexity, R2_array)
             plt.show()
 
-    elif plot == 'lambdas polynomial plot':
+    elif plot == 'lambdas': # only kfold
+        maxlamb = np.log10(lamb)
+        steps = 500
+        lambdas = np.logspace(-3, maxlamb, steps)
+        if model == 'OLS': print("Can't iterate over lambdas. Model='OLS' means lambda=0. Use plot='polynomial' or model='Ridge' or 'Lasso' instead")
+        if model == 'Ridge':
+            MSE_train_array = np.zeros((steps))
+            MSE_test_array = np.zeros((steps))
+            for i in range(steps):
+                MSE_train_array[i], MSE_test_array[i] = Regression(z, p, lambdas[i], model, resampling, error)[0:2]
+
+            plt.plot(np.log10(lambdas), MSE_train_array, label='$\lambda_{train}$')
+            plt.plot(np.log10(lambdas), MSE_test_array, dashes=[6, 2], label='$\lambda_{test}$')
+            plt.legend(loc='center left', bbox_to_anchor=(0.9, 0.6), fancybox=True, shadow=True)
+            plt.subplots_adjust(right=0.85)
+            plt.xlabel('$log{\lambda}$')
+            plt.ylabel('Prediction Error (MSE)')
+            plt.show()
+        if model == 'Lasso':
+            MSE_test_array = np.zeros((steps))
+            for i in range(len(lambdas)):
+                MSE_test_array[i] = Regression(z, p, lambdas[i], model, resampling, error)
+
+            plt.plot(np.log10(lambdas), MSE_test_array, dashes=[6, 2], label='$\lambda_{test}$')
+            plt.legend(loc='center left', bbox_to_anchor=(0.9, 0.6), fancybox=True, shadow=True)
+            plt.subplots_adjust(right=0.85)
+            plt.xlabel('$log{\lambda}$')
+            plt.ylabel('Prediction Error (MSE)')
+            plt.show()
+
+
+    elif plot == 'lambdas polynomial':
+
         steps = 5
-        lambdas = np.linspace(0,lamb,steps)
-        MSE_train_array = np.zeros((steps,p + 1))
-        MSE_test_array = np.zeros((steps,p + 1))
-        for i in range(len(lambdas)):
-            for p in range(p+1):
-                MSE_train_array[i][p], MSE_test_array[i][p] = Regression(z, p, lambdas[i], model, resampling, error)[0:2]
-            plt.plot(complexity, MSE_train_array[i], label = '$\lambda$ = %s, Train'%lambdas[i] )
-            print(MSE_train_array[i])
-            plt.plot(complexity, MSE_test_array[i], dashes=[6, 2], label='$\lambda$ = %s, Test'%lambdas[i])
-        plt.legend()
-        plt.xlabel('Model Complexity')
-        plt.ylabel('Prediction Error (MSE)')
-        plt.show()
+        maxlamb = np.log10(lamb)
+        lambdas = np.logspace(-3, maxlamb, steps)
+        lambdas = [round(l,5) for l in lambdas] # just removing some non-crucial decimals to make the graph labels fit the plot
+        lambdas = [0,0.02,0.1,1,10]
+        if resampling == 'kfold':
+
+            if model == 'OLS': print("Can't iterate over lambdas. Model='OLS' means lambda=0. Use plot='polynomial' or model='Ridge' or 'Lasso' instead")
+            elif model == 'Ridge':
+                MSE_train_array = np.zeros((steps,p + 1))
+                MSE_test_array = np.zeros((steps,p + 1))
+                mpl.rcParams['axes.prop_cycle'] = cycler(color=colors)
+                for i in range(len(lambdas)):
+                    for p in range(p+1):
+                        MSE_train_array[i][p], MSE_test_array[i][p] = Regression(z, p, lambdas[i], model, resampling, error)[0:2]
+
+                    plt.plot(complexity, MSE_train_array[i], label = '$\lambda_{train}$ = %s'%lambdas[i] )
+                    plt.plot(complexity, MSE_test_array[i], dashes=[6, 2], label='$\lambda_{test}$ = %s'%lambdas[i])
+                plt.legend(loc='center left', bbox_to_anchor=(0.9, 0.6), fancybox=True, shadow=True)
+                plt.subplots_adjust(right=0.75)
+                plt.xlabel('Model Complexity')
+                plt.ylabel('Prediction Error (MSE)')
+                plt.show()
+            elif model == 'Lasso': # Only MSE_test. Cross_val_score(sklearn) only returns MSE_test.
+                MSE_test_array = np.zeros((steps, p + 1))
+                for i in range(len(lambdas)):
+                    for p in range(p + 1):
+                        MSE_test_array[i][p] = Regression(z, p, lambdas[i], model, resampling, error)
+
+                    plt.plot(complexity, MSE_test_array[i], label='$\lambda$ = %s' % lambdas[i])
+                plt.legend(loc='center left', bbox_to_anchor=(0.95, 0.77), fancybox=True, shadow=True)
+                plt.subplots_adjust(right=0.75)
+                plt.xlabel('Model Complexity')
+                plt.ylabel('Prediction Error (MSE)')
+                plt.show()
+
+        elif resampling == 'none':
+
+            MSE_array = np.zeros((steps, p + 1))
+            for i in range(len(lambdas)):
+                for p in range(p+1):
+                    MSE_array[i][p] = Regression(z, p, lambdas[i], model, resampling, error)[0]
+
+                plt.plot(complexity, MSE_array[i], label = '$\lambda$ = %s'%lambdas[i] )
+            plt.legend(loc='center left', bbox_to_anchor=(0.95, 0.77), fancybox=True, shadow=True)
+            plt.subplots_adjust(right=0.75)
+            plt.xlabel('Model Complexity')
+            plt.ylabel('Prediction Error (MSE)')
+            plt.show()
 
 
 
-""" def plotting(z, p = 3, lamb = 0, model = 'OLS', resampling = 'kfold', error = 'MSE', plot = 'polynomial plot') """
+""" def plotting(z, p = 3, lamb = 0, model = 'OLS', resampling = 'kfold', error = 'MSE', plot = 'polynomial') """
 
 #X = CreateDesignMatrix(x,y,3)
 #Confidence(X,z)
@@ -214,8 +304,9 @@ def plotting(z, p = 3, lamb = 0, model = 'OLS', resampling = 'kfold', error = 'M
 #print(ErrorAnalysis(z,z_tilde))
 #plotting(z,6,polyplot=True, error='R2')
 
-plotting(z,3,5, model = 'Ridge', plot = 'lambdas polynomial plot')
-#plotting(z,15, 0.5,model ='Ridge',resampling ='kfold')
+#plotting(z,3,5, model = 'Ridge', plot = 'lambdas polynomial')
+#plotting(z,15, 100000,model ='Lasso',resampling ='kfold', plot= 'lambdas')
+plotting(z, 12, 10, model= 'OLS', resampling= 'kfold', plot ='polynomial')
 
 
 

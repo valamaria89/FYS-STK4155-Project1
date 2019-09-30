@@ -187,7 +187,7 @@ splits = 5
 
 def Ridge_hm(X, z, lamb):
     I = np.identity(X.shape[1])
-    beta_ridgeOLS = np.linalg.inv(X.T.dot(X) +lamb*I).dot(X.T.dot(z))
+    beta_ridgeOLS = np.linalg.pinv(X.T.dot(X) +lamb*I).dot(X.T.dot(z))
 
     return beta_ridgeOLS
 
@@ -230,12 +230,12 @@ def Kfold_hm(X,z, lamb):
         z_test = z_k[i]
 
         if (lamb == 0):
-            beta_train = np.linalg.inv(X_train.T.dot(X_train)).dot(X_train.T.dot(z_train))
+            beta_train = np.linalg.pinv(X_train.T.dot(X_train)).dot(X_train.T.dot(z_train))
 
         else:
             beta_train = Ridge_hm(X_train, z_train,lamb)
 
-        #beta_test = np.linalg.inv(X_test.T.dot(X_test)).dot(X_test.T.dot(z_test))
+        #beta_test = np.linalg.pinv(X_test.T.dot(X_test)).dot(X_test.T.dot(z_test))
         z_tilde = X_train.dot(beta_train)
         z_predict = X_test.dot(beta_train)
 
@@ -404,7 +404,7 @@ def Plot_nthLambda_MSE_Mean(z,p,nlambdas):
 def train_test(X, z, lamb):
     X_train, X_test, z_train, z_test = train_test_split(X, z, test_size=0.2)
 
-    beta_train = np.linalg.inv(X_train.T.dot(X_train) + lamb * np.identity(X_train.shape[1])).dot(X_train.T.dot(z_train))
+    beta_train = np.linalg.pinv(X_train.T.dot(X_train) + lamb * np.identity(X_train.shape[1])).dot(X_train.T.dot(z_train))
     z_predict = X_test.dot(beta_train)
     return z_test, z_predict
 
