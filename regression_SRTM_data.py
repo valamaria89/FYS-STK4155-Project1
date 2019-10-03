@@ -147,7 +147,7 @@ def Regression(z, p = 3,lamb = 0, model = 'OLS', resampling = 'kfold', error ='M
     if (model == 'OLS' or model == 'Ridge'):
         if model == 'OLS': lamb = 0
         betas = beta(X, z, lamb)
-        print("Betas: ", betas)
+        #print("Betas: ", betas)
         print("polynomial: ", p, " Determinant: ", np.linalg.det(X.T.dot(X)))
         z_tilde = X.dot(betas)
 
