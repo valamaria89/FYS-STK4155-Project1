@@ -21,7 +21,9 @@ from scipy import stats
 import pandas as pd
 from cycler import cycler
 import matplotlib as mpl
-from matplotlib.ticker import NullFormatter 
+from matplotlib.ticker import NullFormatter
+from sklearn.pipeline import make_pipeline 
+from sklearn.utils import resample
 
 colors = ['#1f77b4', '#1f77b4', '#aec7e8','#aec7e8','#ff7f0e','#ff7f0e','#d62728','#d62728','#2ca02c','#2ca02c','#98df8a','#98df8a','#ffbb78','#ffbb78']
 
@@ -30,6 +32,7 @@ seed = 4000
 
 x = np.arange(0, 1, 0.05)
 y = np.arange(0, 1, 0.05)
+
 
 n = x.size
 x, y = np.meshgrid(x,y)
@@ -49,9 +52,8 @@ def FrankeFunction(x,y):
 z = FrankeFunction(x, y)
 z = np.ravel(z)
 np.random.seed(seed)
-#noiseadj = 0.001
 noise = np.random.randn(z.shape[0])
-#z += noise*noiseadj
+
 
 #print(z)
 
@@ -110,12 +112,12 @@ def check_scikitLearn(X, z):
 
 
 #Error analysis
-def R2(z, z_tilde):
+def R2(z_tilde, z):
     #print('z ',z)
     #print('zean', np.mean(z))
     #print('final ',z-np.mean(z))
     #if((sum(z-np.mean(z)))==0): print(z)
-    return 1- np.sum((z-z_tilde)**2)/np.sum((z-np.mean(z))**2)
+    return 1- (np.sum((z-z_tilde)**2)/np.sum((z-np.mean(z))**2))
 
 def MSE(z, z_tilde):
     n = np.size(z_tilde)
@@ -206,7 +208,7 @@ print('Mean absolute error: %.2f' % mean_absolute_error(z, z_tilde))"""
 
 
 def Train_Test_Reg(X,z, model, lamb):
-    X_train, X_test, z_train, z_test = train_test_split(X, z, test_size=0.2)
+    X_train, X_test, z_train, z_test = train_test_split(X, z, test_size=0.2, random_state=seed)
 
     if (model == 'OLS'):
         beta_train = beta(X_train, z_train) # Matrix inversion
@@ -313,8 +315,8 @@ def Kfold_hm(X,z, model, lamb):
         z_tilde = X_train.dot(beta_train) #+ model_lasso.intercept_
         z_predict = X_test.dot(beta_train) #+ model_lasso.intercept_
 
-        MSE_train_i = R2(z_tilde, z_train)
-        MSE_test_i = R2(z_predict, z_test)
+        MSE_train_i = MSE(z_tilde, z_train)
+        MSE_test_i = MSE(z_predict, z_test)
 
         MSE_train = np.append(MSE_train, MSE_train_i)
         MSE_test = np.append(MSE_test, MSE_test_i)
@@ -426,7 +428,7 @@ def Plot_nthPoly_regular( z, error, model, p, nlambdas, pol_LasRid):
     ncol = 4
     fig, axs = plt.subplots(nrow, ncol)
     fig.tight_layout()
-    fig.text(0.5, 0.01, '# Polynomials', ha='center')
+    fig.text(0.5, 0.01, 'log10(lambdas)', ha='center')
     fig.text(0.01, 0.5, 'MSE', va='center', rotation='vertical')
     
     
@@ -439,7 +441,7 @@ def Plot_nthPoly_regular( z, error, model, p, nlambdas, pol_LasRid):
             error_test_mean = np.zeros((p+1))
             for pol in range(p+1):
                 X = CreateDesignMatrix_X(x, y, (pol+1)) # Using the mesh x,y defined on the top
-                X_train, X_test, z_train, z_test, z_predict, z_tilde = Train_Test_Reg(X, z, model, nlambdas)
+                X_train, X_test, z_train, z_test, z_predict, z_tilde = Train_Test_Reg(X, z_new, model, nlambdas)
 
                 if (error=='MSE'):
                     error_train_pol = MSE(z_tilde, z_train)
@@ -457,7 +459,7 @@ def Plot_nthPoly_regular( z, error, model, p, nlambdas, pol_LasRid):
                 error_train_mean[pol] =  error_train_mean_pol
                 error_test_mean[pol] = error_test_mean_pol
             
-        elif(model=='Ridge' and 'Lasso'):
+        elif(model=='Ridge' or 'Lasso'):
 
             lambdas = np.logspace(-8, 5, nlambdas)
             error_train_mean = np.zeros((nlambdas))
@@ -468,10 +470,10 @@ def Plot_nthPoly_regular( z, error, model, p, nlambdas, pol_LasRid):
                 
                  # Using the mesh x,y defined on the top
                 if (model=='Ridge'):
-                    X_train, X_test, z_train, z_test, z_predict, z_tilde = Train_Test_Reg(X, z, model, lambdas[l])
+                    X_train, X_test, z_train, z_test, z_predict, z_tilde = Train_Test_Reg(X, z_new, model, lambdas[l])
 
                 elif (model=='Lasso'):
-                    X_train, X_test, z_train, z_test, z_predict, z_tilde = Train_Test_Reg(X, z, model, lambdas[l])
+                    X_train, X_test, z_train, z_test, z_predict, z_tilde = Train_Test_Reg(X, z_new, model, lambdas[l])
           
                 if (error=='MSE'):
                     error_train_l = MSE(z_tilde, z_train)
@@ -486,34 +488,41 @@ def Plot_nthPoly_regular( z, error, model, p, nlambdas, pol_LasRid):
 
                 error_train_mean[l] = error_train_mean_l
                 error_test_mean[l] = error_test_mean_l
-            
+        ind = np.argmax(error_test_mean)
+        print("noise: ", noiseadj[i])
+        print("max lambda ", lambdas[ind])
+        print("max lambda log ", np.log10(lambdas[ind]))
+        print("   ")
         ax.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
         ax.set_title(' noise = %s'%noiseadj[i])
-        ax.plot(complex, error_train_mean)
-        ax.plot(complex, error_test_mean)
-        #ax.plot(complex, MSE_sci)
+        ax.plot(np.log10(lambdas), error_train_mean)
+        ax.plot(np.log10(lambdas), error_test_mean)
+        #ax.plot(complex, MSE_sci) np.log10(lambdas)
         ax.legend(['MSE train mean','MSE test mean'], loc='upper left')
     
     
 
     plt.show()
-Plot_nthPoly_regular(z, 'MSE', 'OLS', 10, 0, 0)    
+#Plot_nthPoly_regular(z, 'MSE', 'Ridge', 0, 500, 2)    
 
-def Plot_nthLambda_nthPoly_Regular(z, error, p = 3, lamb = 0, model = 'Ridge'):
-    steps = 5
+def Plot_nthLambda_nthPoly_Regular(z, error, noiseadj, p = 3, lamb = 0, model = 'Ridge'):
+    
+    z += noise*noiseadj
+    steps = 7
     maxlamb = np.log10(lamb)
-    lambdas = np.logspace(-6, maxlamb, steps)
-    lambdas = [round(l,5) for l in lambdas] # just removing some non-crucial decimals to make the graph labels fit the plot
-    #lambdas = [0.003,0.03,0.3,3,30]
-    complexity = np.arange(0,p+1)
+    lambdas = np.logspace(-8, maxlamb, steps)
+    #lambdas = [round(l,5) for l in lambdas] # just removing some non-crucial decimals to make the graph labels fit the plot
+    #lambdas = [1e-08, 2.15e-07, 4.64e-06,0.0001,0.0022,0.046, 1]
+    lambdas = [1e-08, 1.458e-07, 2.154e-06,3.162e-05, 0.00046, 0.0068, 0.1] # Lasso
+    complexity = np.arange(1,p+1)
 
    # if model == 'OLS': print("Can't iterate over lambdas. Model='OLS' means lambda=0. Use plot='polynomial' or model='Ridge' or 'Lasso' instead")
     #elif model == 'Ridge':
-    error_train_array = np.zeros((steps,p + 1))
-    error_test_array = np.zeros((steps,p + 1))
+    error_train_array = np.zeros((steps,p ))
+    error_test_array = np.zeros((steps,p ))
     mpl.rcParams['axes.prop_cycle'] = cycler(color=colors)
     for i in range(len(lambdas)):
-        for p in range(p+1):
+        for p in range(1, p+1):
             X = CreateDesignMatrix_X(x, y, p)
             if (model=='Ridge'):
                     X_train, X_test, z_train, z_test, z_predict, z_tilde = Train_Test_Reg(X, z, model, lambdas[i])
@@ -529,37 +538,37 @@ def Plot_nthLambda_nthPoly_Regular(z, error, p = 3, lamb = 0, model = 'Ridge'):
                 error_train_i = R2(z_tilde, z_train)
                 error_test_i = R2(z_predict, z_test)
 
-            error_train_array[i][p] =  np.mean(error_train_i)
-            error_test_array[i][p] =  np.mean(error_test_i)
+            error_train_array[i][p-1] =  error_train_i
+            error_test_array[i][p-1] =  error_test_i
     
 
         plt.plot(complexity, error_train_array[i], label = '$\lambda_{train}$ = %s'%lambdas[i] )
         plt.plot(complexity, error_test_array[i], dashes=[6, 2], label='$\lambda_{test}$ = %s'%lambdas[i])
     plt.legend(loc='center left', bbox_to_anchor=(0.9, 0.6), fancybox=True, shadow=True)
     plt.subplots_adjust(right=0.75)
-    plt.xlabel('Model Complexity for Ridge without resampling')
-    plt.ylabel('Prediction Error (MSE)')
+    plt.xlabel('Model Complexity for Lasso without resampling')
+    plt.ylabel('R2')
     plt.show()
 
-#Plot_nthLambda_nthPoly_Regular(z, 'MSE', 5, 1, 'Ridge')
+#Plot_nthLambda_nthPoly_Regular(z, 'R2', 0.1, 5, 0.1, 'Lasso')
 
 def Plot_nthPoly_MSE_Mean(z,p): # p is max polynominal
     MSE_train_mean = np.zeros((p+1))
     MSE_test_mean = np.zeros((p+1))
     MSE_sci = np.zeros((p+1))
-    noiseadj = [ 0.5, 0.25, 0.1, 0.01]
+    noiseadj = [ 1, 0.5, 0.1, 0.01]
     nrow = 1
     ncol = 4
     fig, axs = plt.subplots(nrow, ncol)
     fig.tight_layout()
     fig.text(0.5, 0.01, '# Polynomials', ha='center')
-    fig.text(0.01, 0.5, 'R^{2} score', va='center', rotation='vertical')
+    fig.text(0.01, 0.5, 'MSE', va='center', rotation='vertical')
     
     complex = np.arange(0,p+1)
     for i, ax in enumerate(fig.axes):
         z_new = z+noise*noiseadj[i]
         for pol in range(p+1):
-            X = CreateDesignMatrix_X(x, y, pol) # Using the mesh x,y defined on the top
+            X = CreateDesignMatrix_X(x, y, (pol+1)) # Using the mesh x,y defined on the top
             #print("polynomial: ", i, " Determinant: ", np.linalg.det(X.T.dot(X)))
             MSE_train_mean_pol = MSE_Mean_Kfold(X,z_new,'OLS', 0)[1]
             MSE_test_mean_pol = MSE_Mean_Kfold(X,z_new,'OLS', 0)[2]
@@ -574,13 +583,13 @@ def Plot_nthPoly_MSE_Mean(z,p): # p is max polynominal
         ax.plot(complex, MSE_train_mean)
         ax.plot(complex, MSE_test_mean)
         #ax.plot(complex, MSE_sci)
-        ax.legend(['R2 train mean','R2 test mean'], loc='upper left')
+        ax.legend(['MSE train mean','MSE test mean'], loc='upper left')
     
     
 
     plt.show()
 
- 
+#Plot_nthPoly_MSE_Mean(z,10) 
 # This function plots the mean of k-folds MSE with respect to different lambdas, with given poly degree 
 def Plot_nthLambda_MSE_Mean(z,p, model, nlambdas):
     
@@ -610,90 +619,44 @@ def Plot_nthLambda_MSE_Mean(z,p, model, nlambdas):
             MSE_train_mean[l] = MSE_train_mean_l
             MSE_test_mean[l] = MSE_test_mean_l
 
-        #estimated_mse_sklearn_ridge = scikitLearn_Ridge(X, z, nlambdas, lambdas)
-        #estimated_mse_sklearn_lasso = scikitLearn_Lasso(X, z, nlambdas, lambdas)
-        #print(MSE_test_mean)
+        
+
+        ind = np.argmin(MSE_test_mean)
+        print("noise: ", noiseadj[i])
+        print("max lambda ", lambdas[ind])
+        print("max lambda log ", np.log10(lambdas[ind]))
+        print("   ")
         ax.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
         ax.set_title(' noise = %s'%noiseadj[i])
         ax.plot(np.log10(lambdas), MSE_train_mean)
         ax.plot(np.log10(lambdas), MSE_test_mean)
-    #ax.plot(complex, MSE_sci)
-        ax.legend(['MSE Lasso train','MSE Lasso test'], loc='upper left')
-        #print(np.amin(MSE_test_mean))
-    #plt.plot(np.log10(lambdas), MSE_train_mean)
-    #plt.plot(np.log10(lambdas), MSE_test_mean)
-    #plt.plot(np.log10(lambdas), estimated_mse_sklearn_ridge)
-    #plt.plot(np.log10(lambdas), estimated_mse_sklearn_lasso)
-    #plt.plot(complex, MSE_sci)
-
-    #plt.legend(['MSE train mean_ridge','MSE test mean_ridge', 'MSE SK Ridge', "MSE SK Lasso"], loc='upper left')
-    #plt.xlabel("log10(lambda)")
-    #plt.ylabel("mse")
-    plt.show()
-
-
-#Plot_nthLambda_MSE_Mean(z,4, 'Ridge', 500)
-
-def train_test(X, z, lamb):
-    X_train, X_test, z_train, z_test = train_test_split(X, z, test_size=0.2)
-
-    beta_train = np.linalg.pinv(X_train.T.dot(X_train) + lamb * np.identity(X_train.shape[1])).dot(X_train.T.dot(z_train))
-    z_predict = X_test.dot(beta_train)
-    return z_test, z_predict
-
-def Plot_VarBias_nthpoly(z,p):
-    error = np.zeros(p+1)
-    bias = np.zeros(p+1)
-    variance = np.zeros(p+1)
-    Error_biva = np.zeros(p+1)
-    complexity = np.arange(0,p+1)
-    noiseadj = [2, 1, 0.5, 0.1, 0.01]
-    nrow = 1
-    ncol = 5
-    fig, axs = plt.subplots(nrow, ncol)
-    fig.tight_layout()
-    fig.text(0.5, 0.01, '# Polynomials', ha='center')
-    fig.text(0.01, 0.5, 'MSE', va='center', rotation='vertical')
     
-    complex = np.arange(0,p+1)
-    for i, ax in enumerate(fig.axes):
-        z_new = z+noise*noiseadj[i]
-        for pol in range(p+1):
-            X = CreateDesignMatrix_X(x, y, pol)
-            z_test,z_predict = train_test(X, z_new, 0)
-            error[pol] =  np.mean((z_test - z_predict)**2)
-            bias[pol] = np.mean((z_test - np.mean(z_predict))**2)
-            variance[pol] = np.mean( np.var(z_predict))
-            Error_biva[pol] = bias[pol] + variance[pol] + np.mean(noise)
-
-        ax.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
-        ax.set_title(' noise = %s'%noiseadj[i])
-        ax.plot(complex, Error_biva, label='Error_biva')
-        ax.plot(complex, error, label='Error')
-        ax.plot(complex, bias, label='bias')
-        ax.plot(complex, variance, label='Variance')
-        ax.legend()
-
+        ax.legend(['MSE Lasso train','MSE Lasso test'], loc='lower left')
+      
     plt.show()
 
-#Plot_VarBias_nthpoly(z,10)
-def Plot_nthLambda_nthPoly(z, p = 3, lamb = 0, model = 'Ridge'):
-    steps = 5
+
+#Plot_nthLambda_MSE_Mean(z,4, 'Lasso', 500)
+
+
+def Plot_nthLambda_nthPoly(z, noiseadj, p = 3, lamb = 0, model = 'Ridge'):
+    z += noise*noiseadj
+    steps = 7
     maxlamb = np.log10(lamb)
-    lambdas = np.logspace(-6, maxlamb, steps)
-    lambdas = [round(l,5) for l in lambdas] # just removing some non-crucial decimals to make the graph labels fit the plot
-    #lambdas = [0.003,0.03,0.3,3,30]
-    complexity = np.arange(0,p+1)
+    lambdas = np.logspace(-8, maxlamb, steps)
+    #lambdas = [round(l,5) for l in lambdas] # just removing some non-crucial decimals to make the graph labels fit the plot
+    #lambdas = [1e-05, 3.162e-05, 0.00016, 0.00052, 0.001, 0.0032,0.01]
+    complexity = np.arange(1,p+1)
 
    # if model == 'OLS': print("Can't iterate over lambdas. Model='OLS' means lambda=0. Use plot='polynomial' or model='Ridge' or 'Lasso' instead")
     #elif model == 'Ridge':
-    MSE_train_array = np.zeros((steps,p + 1))
-    MSE_test_array = np.zeros((steps,p + 1))
+    MSE_train_array = np.zeros((steps,p ))
+    MSE_test_array = np.zeros((steps,p ))
     mpl.rcParams['axes.prop_cycle'] = cycler(color=colors)
     for i in range(len(lambdas)):
-        for p in range(p+1):
+        for p in range(1,p+1):
             X = CreateDesignMatrix_X(x, y, p)
-            MSE_train_array[i][p], MSE_test_array[i][p] = MSE_Mean_Kfold(X, z, model, lambdas[i])[1:3]
+            MSE_train_array[i][p-1], MSE_test_array[i][p-1] = MSE_Mean_Kfold(X, z, model, lambdas[i])[1:3]
 
     
 
@@ -702,24 +665,10 @@ def Plot_nthLambda_nthPoly(z, p = 3, lamb = 0, model = 'Ridge'):
     plt.legend(loc='center left', bbox_to_anchor=(0.9, 0.6), fancybox=True, shadow=True)
     plt.subplots_adjust(right=0.75)
     plt.xlabel('Model Complexity for Lasso')
-    plt.ylabel('Prediction Error (MSE)')
+    plt.ylabel('MSE')
     plt.show()
-    #elif model == 'Lasso': # Only MSE_test. Cross_val_score(sklearn) only returns MSE_test.
-        
-      #  MSE_train_array = np.zeros((steps,p + 1))
-     #   MSE_test_array = np.zeros((steps, p + 1))
-       # for i in range(len(lambdas)):
-        #    for p in range(p + 1):
-         #       k = 5
-          #      X = CreateDesignMatrix_X(x, y, p)
-           #     MSE_train_array[i][p], MSE_test_array[i][p] = MSE_Mean_Kfold(X, z, model, lambdas[i])[1:3]
-
-            #plt.plot(complexity, MSE_test_array[i], label='$\lambda$ = %s' % lambdas[i])
-       # plt.legend(loc='center left', bbox_to_anchor=(0.95, 0.77), fancybox=True, shadow=True)
-       # plt.subplots_adjust(right=0.75)
-       # plt.xlabel('Model Complexity')
-       # plt.ylabel('Prediction Error (MSE)')
-       # plt.show()
+  
+Plot_nthLambda_nthPoly(z,0.001, 5, 0.001, 'Lasso')  
 
 # print("Error: ", error[i])
 # print('Bias^2:', bias[i])
@@ -740,5 +689,5 @@ def Plot_nthLambda_nthPoly(z, p = 3, lamb = 0, model = 'Ridge'):
 #Plot_VarBias_nthpoly(z,10)
 #Plot_nthLambda_MSE_Mean(z,2, 500)
 #Plot_nthPoly_MSE_Mean(z,10)
-#Plot_nthLambda_nthPoly(z,5, 1, 'Lasso')
+#Plot_nthLambda_nthPoly(z,0.01, 5, 1, 'Lasso')
 
