@@ -75,7 +75,7 @@ z = FrankeFunction(x, y)
 z_val = FrankeFunction(x_val,y_val)
 
 # Create noise
-noiseadj = 0.01
+noiseadj = 0.001
 
 noise = noiseadj*np.random.randn(N,N)
 noise_val = noiseadj*np.random.randn(N_val,N_val)
@@ -99,7 +99,10 @@ error= np.zeros(p)
 bias =np.zeros(p)
 variance =np.zeros(p)
 
-lin = LinearRegression(fit_intercept=False)
+lin = skl.Ridge(alpha = 1e-03, fit_intercept=False, normalize=True)
+#skl.Ridge(alpha = 0.01, fit_intercept=False, normalize=True)
+#skl.Lasso(alpha=0.000, fit_intercept=False, normalize=True, tol=0.01)
+#LinearRegression(fit_intercept=False)
 for deg in range(1,p+1):
     
     X = CreateDesignMatrix_X(x,y,deg)
@@ -113,10 +116,11 @@ for deg in range(1,p+1):
     error[deg-1] = np.mean( np.mean((z_test - z_pred)**2, axis=1, keepdims=True) )
     bias[deg-1] = np.mean( (z_test - np.mean(z_pred, axis=1, keepdims=True))**2 )
     variance[deg-1] = np.mean( np.var(z_pred, axis=1, keepdims=True) )
-    #err.append(error)
-    #bi.append(bias)
-    #vari.append(variance)
-#max_pd = 12 #max polynomial degree to plot to
+    
+    print("Error: ", error[deg-1])
+    print('Bias^2:', bias[deg-1])
+    print('Var:', variance[deg-1])
+    print('{} >= {} + {} = {}'.format(error[deg-1], bias[deg-1], variance[deg-1], bias[deg-1]+variance[deg-1]))
 plt.figure()
 plt.plot(complexity,error,'k',label='MSE')
 plt.plot(complexity,bias,'b',label='Bias^2')

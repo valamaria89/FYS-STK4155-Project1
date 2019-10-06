@@ -40,7 +40,6 @@ x, y = np.meshgrid(x,y)
 
 def FrankeFunction(x,y):
     term1 = 0.75*np.exp(-(0.25*(9*x-2)**2) - 0.25*((9*y-2)**2))
-    #print(term1.size)
     term2 = 0.75*np.exp(-((9*x+1)**2)/49.0 - 0.1*(9*y+1))
     term3 = 0.5*np.exp(-(9*x-7)**2/4.0 - 0.25*((9*y-3)**2))
     term4 = -0.2*np.exp(-(9*x-4)**2 - (9*y-7)**2)
@@ -55,10 +54,9 @@ np.random.seed(seed)
 noise = np.random.randn(z.shape[0])
 
 
-#print(z)
 
+### Code taken from Piazza from Morten Hjort-Jensen 
 
-# def this: 
 def CreateDesignMatrix_X(x, y, n ):
     """
     Function for creating a design X-matrix with rows [1, x, y, x^2, xy, xy^2 , etc.]
@@ -82,8 +80,27 @@ def CreateDesignMatrix_X(x, y, n ):
 X = CreateDesignMatrix_X(x,y,2)
 
 
+############################ Beta-parameters ###########################
+
+# Creates beta parameters for OLS
 def beta(X,z):
     return np.linalg.pinv(X.T.dot(X)).dot(X.T.dot(z))
+
+# Creates beta parameters for Ridge
+def Ridge_hm(X, z, lamb):
+    I = np.identity(X.shape[1])
+    beta_ridge = np.linalg.pinv(X.T.dot(X) +lamb*I).dot(X.T.dot(z))
+
+    return beta_ridge 
+
+
+# Creates beta parameters for Lasso
+def Lasso_SciKit_Beta(X, z, lamb):
+    model_lasso = skl.Lasso(alpha=lamb, fit_intercept=False, normalize=True, tol=0.1)
+    model_lasso.fit(X, z)
+    beta_Lasso =  model_lasso.coef_    
+    return beta_Lasso     
+
 
 def OLS_inv(X, z):
     beta1 = beta(X,z)
@@ -98,79 +115,118 @@ def OLS_svd(x: np.ndarray, y: np.ndarray) -> np.ndarray:
     return v.T @ scl.pinv(scl.diagsvd(s, u.shape[0], v.shape[0])) @ u.T @ y
 
 
-
-#print("z_OLS_inv: ", z_OLS_inv)
-#print("beta_svd: ", beta_SVD)
-
 #check against scikitLearn : 
 def check_scikitLearn(X, z):
     clf = skl.LinearRegression().fit(X, z)
     z_tilde = clf.predict(X)
     return z_tilde
 
-#z_tilde = OLS_inv(X,z)
 
+########################### Error analysis ############################
 
-#Error analysis
+# R² score 
 def R2(z_tilde, z):
-    #print('z ',z)
-    #print('zean', np.mean(z))
-    #print('final ',z-np.mean(z))
-    #if((sum(z-np.mean(z)))==0): print(z)
     return 1- (np.sum((z-z_tilde)**2)/np.sum((z-np.mean(z))**2))
 
+# MSE 
 def MSE(z, z_tilde):
     n = np.size(z_tilde)
     return np.sum((z-z_tilde)**2)/n
 
+#Relative Error 
 def RelativeError(z, z_tilde):
     return abs((z-z_tilde)/z)
 
+#Variance for beta parameter
 def VarianceBeta(X,z):
-    varZ = 1*noiseadj #np.var(z)
+    varZ = 1*noiseadj 
     return  np.diag(varZ * np.linalg.pinv(X.T.dot(X)))
 
-
+# Standard deviation 
 def SDBeta(X,z):
     return np.sqrt((VarianceBeta(X,z)))
 
 
-def Ridge_hm(X, z, lamb):
-    I = np.identity(X.shape[1])
-    beta_ridge = np.linalg.pinv(X.T.dot(X) +lamb*I).dot(X.T.dot(z))
+  
 
-    return beta_ridge   
+################## SciKit-Learn codes to check against home-made codes ####################
 
-def Lasso_SciKit_Beta(X, z, lamb):
-    model_lasso = skl.Lasso(alpha=lamb, fit_intercept=False, normalize=True, tol=0.1)
-    model_lasso.fit(X, z)
-    beta_Lasso =  model_lasso.coef_    
-    return beta_Lasso 
-
+# Beta parameters for OLS
 def OLS_Scikit_Beta(X, z):
     reg = LinearRegression(fit_intercept=False, normalize=True).fit(X,z)
     beta = reg.coef_
-    return beta
+    return beta    
+
+# MSE from Scikit-Learn with k-fold resampling method
+def MSE_ScikitLearn(X,z):
+
+    kfold = KFold(n_splits=splits,shuffle=False)
+    clf = skl.LinearRegression().fit(X, z)
+    estimated_mse_sklearn = cross_val_score(clf,X,z, scoring="neg_mean_squared_error",cv=kfold)
+    estimated_mse_sklearn = -estimated_mse_sklearn
+    return estimated_mse_sklearn
+
+def scikitLearn_OLS(X, z,):
+    #Scikit K-fold-MSE-mean
+    kfold = KFold(n_splits=splits,shuffle=True, random_state=seed)
+    clf = skl.LinearRegression(fit_intercept=False, normalize=True).fit(X, z)
+    estimated_mse_sklearn = cross_val_score(clf,X,z, scoring="neg_mean_squared_error",cv=kfold)
+    estimated_mse_sklearn = np.mean(-estimated_mse_sklearn)
+
+# Ridge Regression from Scikit-Learn with k-fold resampling method for different lambdas 
+def scikitLearn_Ridge(X, z, nlambdas, lambdas):
+
+    estimated_mse_sklearn = np.zeros(nlambdas)
+    i = 0
+    for lmb in lambdas:
+
+        k = 5
+        kfold = KFold(n_splits = k, shuffle=True, random_state=seed)
+        ridge = skl.Ridge(alpha = lmb, fit_intercept=False, normalize=True)
+        estimated_mse_folds = cross_val_score(ridge, X, z,scoring='neg_mean_squared_error', cv=kfold)
+        estimated_mse_sklearn[i] = np.mean(-estimated_mse_folds)
+
+        i += 1
+
+
+    return estimated_mse_sklearn
+
+
+# Lasso Regression from Scikit-Learn with k-fold resampling method for different lambdas 
+def scikitLearn_Lasso(X, z, nlambdas, lambdas):
+  
+    estimated_mse_sklearn = np.zeros(nlambdas)
+    i = 0
+    
+    for lmb in lambdas:
+        k = 5
+        kfold = KFold(n_splits = k, shuffle=True,random_state=seed)
+        model_lasso = skl.Lasso(alpha=lmb, fit_intercept=False, normalize=True)
+        estimated_mse_folds = cross_val_score(model_lasso, X, z,scoring='neg_mean_squared_error', cv=kfold)
+        estimated_mse_sklearn[i] = np.mean(-estimated_mse_folds)
+        i += 1
+
+    return estimated_mse_sklearn
+
+
+################# Functions for plotting beta parameters with conficence intervals ########################
 
 def ErrorBars(X, z, lamb):
-    ####### error bars and plots
     betaArray = np.array(Lasso_SciKit_Beta(X,z, lamb))
 
     zScore = stats.norm.ppf(0.95)
     sdArray = []
     x_value = []
-#for i in range(len(betaArray)):
-    #Xs = X[:, i]
+
     sdArray = SDBeta(X, z)
     
     x_value = np.arange(len(betaArray))
-    yerr =  ( zScore * sdArray) # np.sqrt(X.shape[0]))
-#yerr = sdArray
+    yerr =  ( zScore * sdArray) 
+
     return betaArray, x_value
 
 
-def plott_errorbar(z):
-    lambdas = [0.001, 0.01, 0.1, 0.2, 0.3]
+def plott_errorbar(z , lambdas):
     nrow = 2
     ncol = 3
     fig, axs = plt.subplots(nrow, ncol)
@@ -178,7 +234,6 @@ def plott_errorbar(z):
     fig.text(0.5, 0.01, '# β', ha='center')
     fig.text(0.01, 0.5, 'β values', va='center', rotation='vertical')
     for i, ax in enumerate(fig.axes):
-        #ax.set_ylabel('beta values')
         ax.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
         ax.set_title(' p = %s'%(i+1))
         X = CreateDesignMatrix_X(x,y,(i+1))
@@ -190,7 +245,8 @@ def plott_errorbar(z):
    
     plt.show()    
 
-#plott_errorbar(z)
+#lambdas= [0.001, 0.01, 0.1, 0.2, 0.3]
+#plott_errorbar(z,lambdas)
 
 ############ Error analysis ##################
 """print("Variance score R2 code: ", R2(z,z_tilde))
@@ -204,9 +260,11 @@ print('Variance score: %.2f' % r2_score(z,z_tilde))
 # Mean absolute error                                                           
 print('Mean absolute error: %.2f' % mean_absolute_error(z, z_tilde))"""
 
-######### Splitting data into train & test ################
+
+######### Splitting data into train & test without resampling ################
 
 
+# Splits the data into train and test and obtains the beta parameter for all models for then to return the values needed
 def Train_Test_Reg(X,z, model, lamb):
     X_train, X_test, z_train, z_test = train_test_split(X, z, test_size=0.2, random_state=seed)
 
@@ -221,23 +279,13 @@ def Train_Test_Reg(X,z, model, lamb):
 
     z_tilde = X_train.dot(beta_train)
     z_predict = X_test.dot(beta_train) # Matrix inversion
-    """print("Training R2: ")
-    print(R2(z_train, z_tilde))
-    print("Training MSE: ")
-    print(MSE(z_train, z_tilde))
 
-    
-    #z_predict = clf.predict(X_test)
-    print("Test R2 :")
-    print(R2(z_test, z_predict))
-    print("Test MSE: ")
-    print(MSE(z_test, z_predict))"""
     
     return X_train, X_test, z_train, z_test, z_predict, z_tilde
 
 
-
-def Plot_Train_Test_OLS(z, model='OLS'):
+# Plots the relationship between z_test and z_predict 
+def Plot_Train_Test_OLS(z, model='OLS', lamb=0):
 
     noiseadj = [0.5, 0.1, 0.01]
     nrow = 1
@@ -249,7 +297,7 @@ def Plot_Train_Test_OLS(z, model='OLS'):
     for i, ax in enumerate(fig.axes):
 
         z_new = z+noise*noiseadj[i]
-        z_test, z_predict = Train_Test_OLS(X,z_new)
+        z_test, z_predict = Train_Test_Reg(X,z_new, model, lamb)[3:5]
         ax.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
         ax.set_title(' noise = %s'%noiseadj[i])
         ax.scatter(z_test, z_predict)
@@ -260,11 +308,9 @@ def Plot_Train_Test_OLS(z, model='OLS'):
 #Plot_Train_Test_OLS(z)      
 
 ########## Cross validation k-space ##############
-splits = 5
-#X = np.arange(10, 20)
 
-def Kfold_hm(X,z, model, lamb):
-    #Model tells us if we are using OLS or SVD-Ridge or Lasso
+splits = 5
+def Kfold_hm(X,z, error, model, lamb):
 
     #shuffling the data
     shuffle_ind = np.arange(X.shape[0])
@@ -278,13 +324,13 @@ def Kfold_hm(X,z, model, lamb):
         Xshuffled[ind] = X[shuffle_ind[ind]]
         zshuffled[ind] = z[shuffle_ind[ind]]
 
-
+    # splitting the data 
     X_k = np.split(Xshuffled, splits)
     z_k = np.split(zshuffled, splits)
 
-
-    MSE_train = []
-    MSE_test = []
+    # Running the k-fold cross-validation 
+    error_train = []
+    error_test = []
     for i in range(splits):
 
         X_train = X_k
@@ -298,131 +344,55 @@ def Kfold_hm(X,z, model, lamb):
         X_test = X_k[i]
         z_test = z_k[i]
 
+        #Choosing the beta parameter according to model 
         if (model== 'OLS'):
-            beta_train = beta(X_train, z_train) #OLS_Scikit_Beta(X_train, z_train)
-            #beta(X_train, z_train)
-        
-            #np.linalg.pinv(X_train.T.dot(X_train)).dot(X_train.T.dot(z_train))
+            beta_train = beta(X_train, z_train) 
 
         elif (model=='Ridge'):
             beta_train = Ridge_hm(X_train, z_train,lamb)
 
         elif (model=='Lasso'):
             beta_train = Lasso_SciKit_Beta(X_train, z_train, lamb)
-             
+        
 
-        #beta_test = np.linalg.pinv(X_test.T.dot(X_test)).dot(X_test.T.dot(z_test))
-        z_tilde = X_train.dot(beta_train) #+ model_lasso.intercept_
-        z_predict = X_test.dot(beta_train) #+ model_lasso.intercept_
+        z_tilde = X_train.dot(beta_train) 
+        z_predict = X_test.dot(beta_train) 
 
-        MSE_train_i = MSE(z_tilde, z_train)
-        MSE_test_i = MSE(z_predict, z_test)
+        if (error == 'MSE'):
+        # Calculating the MSE 
+            error_train_i = MSE(z_tilde, z_train)
+            error_test_i = MSE(z_predict, z_test)
 
-        MSE_train = np.append(MSE_train, MSE_train_i)
-        MSE_test = np.append(MSE_test, MSE_test_i)
-
-    return MSE_test, MSE_train, z_test, z_predict
-
-
-#print("MSE test: ", MSE_test)
-#print("MSE train: ", MSE_train)
-
-def MSE_ScikitLearn(X,z):
-    kfold = KFold(n_splits=splits,shuffle=False)
-    clf = skl.LinearRegression().fit(X, z)
-    estimated_mse_sklearn = cross_val_score(clf,X,z, scoring="neg_mean_squared_error",cv=kfold)
-    estimated_mse_sklearn = -estimated_mse_sklearn
-    return estimated_mse_sklearn
+        elif (error=='R2'):
+            error_train_i = R2(z_tilde, z_train)
+            error_test_i = R2(z_predict, z_test)
 
 
-def MSE_Mean_Kfold(X,z, model, lamb):
+        error_train = np.append(error_train, error_train_i)
+        error_test = np.append(error_test, error_test_i)
+
+    return error_test, error_train, z_test, z_predict
+
+
+
+# Returns an array of the MSE_train_mean and MSE_test_mean from the k-fold code above 
+def Error_Mean_Kfold(X,z, error, model, lamb):
 
     #Home made Kfold-MSE-mean
-    MSE_test = Kfold_hm(X, z, model, lamb )[0]
-    MSE_train = Kfold_hm(X, z, model , lamb)[1]
-    MSE_train_mean = np.mean(MSE_train,axis=0)
-    MSE_test_mean = np.mean(MSE_test,axis=0)
+    error_test = Kfold_hm(X, z, error, model, lamb )[0]
+    error_train = Kfold_hm(X, z, error, model , lamb)[1]
+    error_train_mean = np.mean(error_train,axis=0)
+    error_test_mean = np.mean(error_test,axis=0)
 
-    #Scikit K-fold-MSE-mean
-    kfold = KFold(n_splits=splits,shuffle=True, random_state=seed)
-    clf = skl.LinearRegression(fit_intercept=False, normalize=True).fit(X, z)
-    estimated_mse_sklearn = cross_val_score(clf,X,z, scoring="neg_mean_squared_error",cv=kfold)
-    estimated_mse_sklearn = np.mean(-estimated_mse_sklearn)
-
-    #print("MSE Scikit.Learn: ", estimated_mse_sklearn)
-    #print("MSE train mean: ", MSE_train_mean)
-    #print("MSE test mean: ", MSE_test_mean)
-
-    return estimated_mse_sklearn, MSE_train_mean, MSE_test_mean
+    return error_train_mean, error_test_mean
 
 
 
-def scikitLearn_Lasso(X, z, nlambdas, lambdas):
-   # k = 5
-   # kfold = KFold(n_splits = k)
-    #lambdas = np.logspace(-3, 5, nlambdas)
+################## Plotting functions #################################
 
-    estimated_mse_sklearn = np.zeros(nlambdas)
-    i = 0
-    
-    for lmb in lambdas:
-        
-        k = 5
-        kfold = KFold(n_splits = k, shuffle=True,random_state=seed)
-        model_lasso = skl.Lasso(alpha=lmb, fit_intercept=False, normalize=True)
-        #lasso = linear_model.Lasso()
-        #model_lasso.fit(X,z)
-        #X = model_lasso.predict(X)
-        estimated_mse_folds = cross_val_score(model_lasso, X, z,scoring='neg_mean_squared_error', cv=kfold)
-        estimated_mse_sklearn[i] = np.mean(-estimated_mse_folds)
-        i += 1
-
-    return estimated_mse_sklearn
-
-#print(scikitLearn_Lasso(X,z, 1))
-
-
-def scikitLearn_Ridge(X, z, nlambdas, lambdas):
-
-## Cross-validation with scikitlearn and Ridge with k folds
-    
-
-   # X = X - np.mean(X,axis=0)
-    #poly = PolynomialFeatures(degree = 0)
-    estimated_mse_sklearn = np.zeros(nlambdas)
-    i = 0
-    for lmb in lambdas:
-
-        k = 5
-        kfold = KFold(n_splits = k, shuffle=True, random_state=seed)
-        ridge = skl.Ridge(alpha = lmb, fit_intercept=False, normalize=True)
-        #X = poly.fit_transform(x[:, np.newaxis])
-        #print(X.size)
-        estimated_mse_folds = cross_val_score(ridge, X, z,scoring='neg_mean_squared_error', cv=kfold)
-        estimated_mse_sklearn[i] = np.mean(-estimated_mse_folds)
-
-        i += 1
-
-
-    return estimated_mse_sklearn
-
-
-"""nlambdas = 500
-lambdas = np.logspace(-3, 5, nlambdas)
-estimated_mse_sklearn = scikitLearn_Ridge(x,z, nlambdas, lambdas)
-
-plt.plot(np.log10(lambdas), estimated_mse_sklearn, label = 'cross_val_score')
-plt.xlabel('log10(lambda)')
-plt.ylabel('mse')
-
-plt.legend()
-
-plt.show()"""
+# Function calculates the MSE or R²-score for all the regression models without resampling for nth polynomial for different noises
 def Plot_nthPoly_regular( z, error, model, p, nlambdas, pol_LasRid):
     
-    
-    
-
     noiseadj = [ 1, 0.5, 0.1, 0.01]
     nrow = 1
     ncol = 4
@@ -505,6 +475,8 @@ def Plot_nthPoly_regular( z, error, model, p, nlambdas, pol_LasRid):
     plt.show()
 #Plot_nthPoly_regular(z, 'MSE', 'Ridge', 0, 500, 2)    
 
+
+# Function plots the nth lambda for nth poly without resampling for different noises 
 def Plot_nthLambda_nthPoly_Regular(z, error, noiseadj, p = 3, lamb = 0, model = 'Ridge'):
     
     z += noise*noiseadj
@@ -513,11 +485,10 @@ def Plot_nthLambda_nthPoly_Regular(z, error, noiseadj, p = 3, lamb = 0, model = 
     lambdas = np.logspace(-8, maxlamb, steps)
     #lambdas = [round(l,5) for l in lambdas] # just removing some non-crucial decimals to make the graph labels fit the plot
     #lambdas = [1e-08, 2.15e-07, 4.64e-06,0.0001,0.0022,0.046, 1]
-    lambdas = [1e-08, 1.458e-07, 2.154e-06,3.162e-05, 0.00046, 0.0068, 0.1] # Lasso
+    lambdas = [1e-08, 1.468e-07, 2.154e-06, 3.162e-05, 0.00046, 0.00681, 0.01] # Lasso
     complexity = np.arange(1,p+1)
 
-   # if model == 'OLS': print("Can't iterate over lambdas. Model='OLS' means lambda=0. Use plot='polynomial' or model='Ridge' or 'Lasso' instead")
-    #elif model == 'Ridge':
+   
     error_train_array = np.zeros((steps,p ))
     error_test_array = np.zeros((steps,p ))
     mpl.rcParams['axes.prop_cycle'] = cycler(color=colors)
@@ -547,15 +518,17 @@ def Plot_nthLambda_nthPoly_Regular(z, error, noiseadj, p = 3, lamb = 0, model = 
     plt.legend(loc='center left', bbox_to_anchor=(0.9, 0.6), fancybox=True, shadow=True)
     plt.subplots_adjust(right=0.75)
     plt.xlabel('Model Complexity for Lasso without resampling')
-    plt.ylabel('R2')
+    plt.ylabel('MSE')
     plt.show()
 
-#Plot_nthLambda_nthPoly_Regular(z, 'R2', 0.1, 5, 0.1, 'Lasso')
+Plot_nthLambda_nthPoly_Regular(z, 'MSE', 0.1, 5, 0.1, 'Lasso')
 
-def Plot_nthPoly_MSE_Mean(z,p): # p is max polynominal
-    MSE_train_mean = np.zeros((p+1))
-    MSE_test_mean = np.zeros((p+1))
-    MSE_sci = np.zeros((p+1))
+
+# Plotting the MSE or the R²-score for OLS of the nth polynomial with resampling 
+def Plot_nthPoly_error_Mean(z,p, error): # p is max polynominal
+    error_train_mean = np.zeros((p+1))
+    error_test_mean = np.zeros((p+1))
+    error_sci = np.zeros((p+1))
     noiseadj = [ 1, 0.5, 0.1, 0.01]
     nrow = 1
     ncol = 4
@@ -569,19 +542,20 @@ def Plot_nthPoly_MSE_Mean(z,p): # p is max polynominal
         z_new = z+noise*noiseadj[i]
         for pol in range(p+1):
             X = CreateDesignMatrix_X(x, y, (pol+1)) # Using the mesh x,y defined on the top
-            #print("polynomial: ", i, " Determinant: ", np.linalg.det(X.T.dot(X)))
-            MSE_train_mean_pol = MSE_Mean_Kfold(X,z_new,'OLS', 0)[1]
-            MSE_test_mean_pol = MSE_Mean_Kfold(X,z_new,'OLS', 0)[2]
-            MSE_sci_pol = MSE_Mean_Kfold(X,z_new,'OLS', 0)[0]
 
-            MSE_train_mean[pol] =  MSE_train_mean_pol
-            MSE_test_mean[pol] = MSE_test_mean_pol
+            #print("polynomial: ", i, " Determinant: ", np.linalg.det(X.T.dot(X)))
+            error_train_mean_pol = Error_Mean_Kfold(X,z_new, error,'OLS', 0)[0]
+            error_test_mean_pol = Error_Mean_Kfold(X,z_new, error, 'OLS', 0)[1]
+            
+
+            error_train_mean[pol] =  error_train_mean_pol
+            error_test_mean[pol] = error_test_mean_pol
             #MSE_sci[pol] = MSE_sci_pol
             
         ax.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
         ax.set_title(' noise = %s'%noiseadj[i])
-        ax.plot(complex, MSE_train_mean)
-        ax.plot(complex, MSE_test_mean)
+        ax.plot(complex, error_train_mean)
+        ax.plot(complex, error_test_mean)
         #ax.plot(complex, MSE_sci)
         ax.legend(['MSE train mean','MSE test mean'], loc='upper left')
     
@@ -589,18 +563,20 @@ def Plot_nthPoly_MSE_Mean(z,p): # p is max polynominal
 
     plt.show()
 
-#Plot_nthPoly_MSE_Mean(z,10) 
+#Plot_nthPoly_error_Mean(z,10, 'MSE') 
+
+
 # This function plots the mean of k-folds MSE with respect to different lambdas, with given poly degree 
-def Plot_nthLambda_MSE_Mean(z,p, model, nlambdas):
+def Plot_nthLambda_MSE_Mean(z,p, error, model, nlambdas):
     
     lambdas = np.logspace(-8, 5, nlambdas)
 
 
     X = CreateDesignMatrix_X(x,y,p)
-    #print(lambdas)
-    MSE_train_mean = np.zeros((nlambdas))
-    MSE_test_mean = np.zeros((nlambdas))
-    #print(MSE_train_mean.size)
+    
+    error_train_mean = np.zeros((nlambdas))
+    error_test_mean = np.zeros((nlambdas))
+   
     noiseadj = [1, 0.5, 0.1, 0.01]
     nrow = 1
     ncol = 4
@@ -613,33 +589,33 @@ def Plot_nthLambda_MSE_Mean(z,p, model, nlambdas):
         z_new = z+noise*noiseadj[i]
         for l in range(len(lambdas)):
            # print(l)
-            MSE_train_mean_l = MSE_Mean_Kfold(X,z_new, model, lambdas[l])[1]
-            MSE_test_mean_l = MSE_Mean_Kfold(X,z_new,model, lambdas[l])[2]
+            error_train_mean_l = Error_Mean_Kfold(X,z_new, error, model, lambdas[l])[0]
+            error_test_mean_l = Error_Mean_Kfold(X,z_new, error, model, lambdas[l])[1]
 
-            MSE_train_mean[l] = MSE_train_mean_l
-            MSE_test_mean[l] = MSE_test_mean_l
+            error_train_mean[l] = error_train_mean_l
+            error_test_mean[l] = error_test_mean_l
 
         
 
-        ind = np.argmin(MSE_test_mean)
+        ind = np.argmin(error_test_mean)
         print("noise: ", noiseadj[i])
         print("max lambda ", lambdas[ind])
         print("max lambda log ", np.log10(lambdas[ind]))
         print("   ")
         ax.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
         ax.set_title(' noise = %s'%noiseadj[i])
-        ax.plot(np.log10(lambdas), MSE_train_mean)
-        ax.plot(np.log10(lambdas), MSE_test_mean)
+        ax.plot(np.log10(lambdas), error_train_mean)
+        ax.plot(np.log10(lambdas), error_test_mean)
     
         ax.legend(['MSE Lasso train','MSE Lasso test'], loc='lower left')
       
     plt.show()
 
 
-#Plot_nthLambda_MSE_Mean(z,4, 'Lasso', 500)
+#Plot_nthLambda_MSE_Mean(z,2, 'MSE', 'Lasso', 500)
 
-
-def Plot_nthLambda_nthPoly(z, noiseadj, p = 3, lamb = 0, model = 'Ridge'):
+#This function plots different lambdas for nth polynomial with resampling k-fold 
+def Plot_nthLambda_nthPoly(z, noiseadj, error, p = 3, lamb = 0, model = 'Ridge'):
     z += noise*noiseadj
     steps = 7
     maxlamb = np.log10(lamb)
@@ -648,46 +624,28 @@ def Plot_nthLambda_nthPoly(z, noiseadj, p = 3, lamb = 0, model = 'Ridge'):
     #lambdas = [1e-05, 3.162e-05, 0.00016, 0.00052, 0.001, 0.0032,0.01]
     complexity = np.arange(1,p+1)
 
-   # if model == 'OLS': print("Can't iterate over lambdas. Model='OLS' means lambda=0. Use plot='polynomial' or model='Ridge' or 'Lasso' instead")
-    #elif model == 'Ridge':
-    MSE_train_array = np.zeros((steps,p ))
-    MSE_test_array = np.zeros((steps,p ))
+   
+    error_train_array = np.zeros((steps,p ))
+    error_test_array = np.zeros((steps,p ))
     mpl.rcParams['axes.prop_cycle'] = cycler(color=colors)
     for i in range(len(lambdas)):
         for p in range(1,p+1):
             X = CreateDesignMatrix_X(x, y, p)
-            MSE_train_array[i][p-1], MSE_test_array[i][p-1] = MSE_Mean_Kfold(X, z, model, lambdas[i])[1:3]
+            error_train_array[i][p-1], error_test_array[i][p-1] = Error_Mean_Kfold(X, z, error, model, lambdas[i])[0:2]
 
     
 
-        plt.plot(complexity, MSE_train_array[i], label = '$\lambda_{train}$ = %s'%lambdas[i] )
-        plt.plot(complexity, MSE_test_array[i], dashes=[6, 2], label='$\lambda_{test}$ = %s'%lambdas[i])
+        plt.plot(complexity, error_train_array[i], label = '$\lambda_{train}$ = %s'%lambdas[i] )
+        plt.plot(complexity, error_test_array[i], dashes=[6, 2], label='$\lambda_{test}$ = %s'%lambdas[i])
     plt.legend(loc='center left', bbox_to_anchor=(0.9, 0.6), fancybox=True, shadow=True)
     plt.subplots_adjust(right=0.75)
     plt.xlabel('Model Complexity for Lasso')
     plt.ylabel('MSE')
     plt.show()
   
-Plot_nthLambda_nthPoly(z,0.001, 5, 0.001, 'Lasso')  
-
-# print("Error: ", error[i])
-# print('Bias^2:', bias[i])
-# print('Var:', variance[i])
-# print('{} >= {} + {} = {}'.format(error[i], bias[i], variance[i], bias[i]+variance[i]))
+#Plot_nthLambda_nthPoly(z,0.01, 'MSE', 5, 0.1, 'Lasso')  
 
 
 
 
-########## All plots #############
-#ErrorBars(z, 2)
-#Train_Test_OLS(X,z)
-#MSE_test, MSE_train = Kfold_hm(X,z, 0)
-#MSE_ScikitLearn_OLS = MSE_ScikitLearn(X,z)
-#print("MSE test: ", MSE_test)
-#print("MSE train: ", MSE_train)
-#print("MSE Scikit: ", MSE_ScikitLearn_OLS)
-#Plot_VarBias_nthpoly(z,10)
-#Plot_nthLambda_MSE_Mean(z,2, 500)
-#Plot_nthPoly_MSE_Mean(z,10)
-#Plot_nthLambda_nthPoly(z,0.01, 5, 1, 'Lasso')
 
