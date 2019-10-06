@@ -27,7 +27,7 @@ terrain = imread('SRTM_Oslo_Fjorden.tif')
 # plt.imshow(terrain, cmap='gray')
 # plt.xlabel('X')
 # plt.ylabel('Y')
-#plt.show()
+# plt.show()
 
 
 seed = 206
@@ -47,7 +47,7 @@ def MapMaker(terrain, x_size, y_size):
     z = cut
     z = z.reshape(-1,1)
     return z, x, y
-z,x,y = MapMaker(terrain, 20, 20)
+z,x_array,y_array = MapMaker(terrain, 20, 20)
 
 
 
@@ -63,7 +63,7 @@ def beta(X,z,lamb = 0):
     z = np.ravel(z)
     return np.linalg.pinv(X.T.dot(X) + lamb * np.identity(X.shape[1])).dot(X.T.dot(z))
 
-def Confidence(X, z, betas = None, lamb = 0, result = 'Errorbar', confidence = 0.95):
+def Variance_Bias_Analysis(X, z, lamb = 0, betas = None, result = 'Errorbar', confidence = 0.95):
 
     if betas == None:
         z = z.reshape(-1, 1)
@@ -78,10 +78,10 @@ def Confidence(X, z, betas = None, lamb = 0, result = 'Errorbar', confidence = 0
         yerr = zScore * SD_array #/ np.sqrt(X.shape[0])     # xerr = 0.1
         plt.errorbar(beta_n, betas, yerr, lw=1,linestyle=':',marker='o')
         plt.show()
-    elif result == 'SD':
-        return SD_array
+    elif result == 'SD': return SD_array
+    elif result == 'Variance': return Variance_Beta
 
-def ErrorAnalysis(z1,z2, error = 'MSE'):  # e.g z1 = z_train, z2 = ztilde or z1 = z_test, z2 = z_predict
+def Error_Analysis(z1,z2, error = 'MSE'):  # e.g z1 = z_train, z2 = ztilde or z1 = z_test, z2 = z_predict
     z1 = np.ravel(z1)
     z2 = np.ravel(z2)
     if error == 'MSE':
@@ -137,8 +137,8 @@ def Kfold(X, z, lamb = 0, error ='MSE'):
         z_tilde = X_train.dot(beta_train)
         z_predict = X_test.dot(beta_train)
 
-        MSE_train[i], R2_train[i] = ErrorAnalysis(z_train, z_tilde, error='MSE and R2')
-        MSE_test[i], R2_test[i] = ErrorAnalysis(z_test, z_predict, error='MSE and R2')
+        MSE_train[i], R2_train[i] = Error_Analysis(z_train, z_tilde, error='MSE and R2')
+        MSE_test[i], R2_test[i] = Error_Analysis(z_test, z_predict, error='MSE and R2')
 
     MSE_train_mean = np.mean(MSE_train,axis=0)
     MSE_test_mean = np.mean(MSE_test,axis=0)
@@ -151,7 +151,7 @@ def Kfold(X, z, lamb = 0, error ='MSE'):
 
 ##### Resampling ##### No resampling, resampling = 'none' #####  Bootstrap, resampling = 'bootstrap' ##### k-fold, resampling = 'kfold'
 ##### Model ##### OLS, model = 'OLS', ##### Ridge, model = 'Ridge' ###### Lasso, model = 'Lasso'
-def Regression(z, p = 3,lamb = 0, model = 'OLS', resampling = 'kfold', error ='MSE'):
+def Regression(z, p = 3,lamb = 0, model = 'OLS', resampling = 'kfold', error ='MSE', x = x_array, y = y_array):
     X = CreateDesignMatrix(x,y,p)
 
     if (model == 'OLS' or model == 'Ridge'):
@@ -162,8 +162,9 @@ def Regression(z, p = 3,lamb = 0, model = 'OLS', resampling = 'kfold', error ='M
         z_tilde = X.dot(betas)
 
         if resampling == 'none':
-            MSE, R2 = ErrorAnalysis(z, z_tilde, "MSE and R2")
-            return MSE, R2 , betas, z_tilde
+            MSE, R2 = Error_Analysis(z, z_tilde, "MSE and R2")
+            var_betas = Variance_Bias_Analysis(X,z,lamb, result="Variance")
+            return MSE, R2, var_betas, betas, z_tilde
         elif resampling == 'kfold':
             return Kfold(X,z, lamb)
 
@@ -174,7 +175,7 @@ def Regression(z, p = 3,lamb = 0, model = 'OLS', resampling = 'kfold', error ='M
             model_lasso.fit(X,z)
             betas = model_lasso.coef_
             z_tilde = X.dot(betas)
-            Error = ErrorAnalysis(z,z_tilde, error)
+            Error = Error_Analysis(z,z_tilde, error)
             return Error, betas, z_tilde
         elif resampling == 'kfold':
             splits = 5
@@ -308,9 +309,9 @@ def plotting(z, p = 3, lamb = 0, model = 'OLS', resampling = 'kfold', error = 'M
 """ def plotting(z, p = 3, lamb = 0, model = 'OLS', resampling = 'kfold', error = 'MSE', plot = 'polynomial') """
 
 #X = CreateDesignMatrix(x,y,3)
-#Confidence(X,z)
+#Variance_Bias_Analysis(X,z)
 #beta, z_tilde = Regression(z)
-#print(ErrorAnalysis(z,z_tilde))
+#print(Error_Analysis(z,z_tilde))
 #plotting(z,6,polyplot=True, error='R2')
 
 #plotting(z,3,5, model = 'Ridge', plot = 'lambdas polynomial')
@@ -345,27 +346,14 @@ plt.show()
 """
 
 
-"""y_size = 20
-x_size = 20
-x = np.linspace(0, 1, x_size)
-y = np.linspace(0, 1, y_size)
-x, y = np.meshgrid(x, y)
-
-# Pick a random cut of the map of certain size
-col = random.randint(0,terrain.shape[1]-x_size)
-row = random.randint(0,terrain.shape[0]-y_size)
-cut = terrain[row:row+y_size, col:col+x_size]
-z = cut
-z = z.reshape(-1,1)
-"""
-
 def surface_plotting(terrain, p, lamb=0, model='OLS', num_cuts=3, xsize = 20, ysize = 20, title = ''):
     fig, axs = plt.subplots(num_cuts, 2, subplot_kw={'projection': '3d'})
+    plt.subplots_adjust(hspace=0.8)
     fig.suptitle(title,x= 0.51,y =0.98, fontsize=12, fontweight='bold')
     for num_cut in range(num_cuts):
-        terrain_cut,x,y = MapMaker(terrain, xsize, ysize)
+        terrain_cut,x_array,y_array = MapMaker(terrain, xsize, ysize)
 
-        MSE, R2 , betas, fitted_cut = Regression(terrain_cut,p,lamb,model,resampling='none')
+        MSE, R2, var_betas, betas, fitted_cut = Regression(terrain_cut,p,lamb,model,resampling='none', x = x_array, y = y_array)
 
         rows = np.arange(xsize)
         cols = np.arange(ysize)
@@ -377,18 +365,18 @@ def surface_plotting(terrain, p, lamb=0, model='OLS', num_cuts=3, xsize = 20, ys
 
         ax = fig.axes[num_cut*2]
         ax.plot_surface(X, Y, fitted_cut, cmap=cm.viridis, linewidth=0)
-        ax.set_title('Fitted terrain cut = %s' % num_cut)
+        ax.set_title('Fitted terrain cut = %s' % (num_cut+1))
 
         ax = fig.axes[num_cut*2+1]
         ax.plot_surface(X, Y, terrain_cut, cmap=cm.viridis, linewidth=0)
-        ax.set_title('Terrain cut = %s' % num_cut)
+        ax.set_title('Terrain cut = %s' % (num_cut+1))
 
     plt.show()
 
 
-        # print("----Parameters with uncertainties:----")
-        # for j in range(len(beta_ols)):
-        #     print(beta_ols[j], " +/- ", np.sqrt(var_beta[j]))
+    print("----Parameters with uncertainties:----")
+    for i in range(len(betas)):
+        print(betas[i], " +/- ", np.sqrt(var_betas[i]))
 
         # mse = np.sum((fitted_patch - patch) ** 2) / num_data
         # R2 = 1 - np.sum((fitted_patch - patch) ** 2) / np.sum((patch - np.mean(patch)) ** 2)
@@ -409,4 +397,4 @@ def surface_plotting(terrain, p, lamb=0, model='OLS', num_cuts=3, xsize = 20, ys
         # plt.savefig("realdata/lasso_boot_2_patch"+str(i+1))
         # plt.show()
 
-surface_plotting(terrain,5,model= "OLS", title ='OLS')
+surface_plotting(terrain,5,model= "OLS", title ='OLS, polynomial = 5', xsize=40, ysize=40, num_cuts=3)
