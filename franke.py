@@ -138,13 +138,13 @@ def RelativeError(z, z_tilde):
     return abs((z-z_tilde)/z)
 
 #Variance for beta parameter
-def VarianceBeta(X,z):
+def VarianceBeta(X,z, noiseadj):
     varZ = 1*noiseadj 
     return  np.diag(varZ * np.linalg.pinv(X.T.dot(X)))
 
 # Standard deviation 
-def SDBeta(X,z):
-    return np.sqrt((VarianceBeta(X,z)))
+def SDBeta(X,z, noiseadj):
+    return np.sqrt((VarianceBeta(X,z, noiseadj)))
 
 
   
@@ -206,19 +206,20 @@ def scikitLearn_Lasso(X, z, nlambdas, lambdas):
         estimated_mse_sklearn[i] = np.mean(-estimated_mse_folds)
         i += 1
 
+
     return estimated_mse_sklearn
 
 
 ################# Functions for plotting beta parameters with conficence intervals ########################
 
-def ErrorBars(X, z, lamb):
-    betaArray = np.array(Lasso_SciKit_Beta(X,z, lamb))
+def ErrorBars(X, z, lamb, noiseadj):
+    betaArray = np.array(Beta(X, z))
 
     zScore = stats.norm.ppf(0.95)
     sdArray = []
     x_value = []
 
-    sdArray = SDBeta(X, z)
+    sdArray = SDBeta(X, z, noiseadj)
     
     x_value = np.arange(len(betaArray))
     yerr =  ( zScore * sdArray) 
@@ -226,7 +227,7 @@ def ErrorBars(X, z, lamb):
     return betaArray, x_value
 
 
-def plott_errorbar(z , lambdas):
+def plott_errorbar(z , lambdas, noiseadj):
     nrow = 2
     ncol = 3
     fig, axs = plt.subplots(nrow, ncol)
@@ -238,7 +239,7 @@ def plott_errorbar(z , lambdas):
         ax.set_title(' p = %s'%(i+1))
         X = CreateDesignMatrix_X(x,y,(i+1))
         for l in range(len(lambdas)):
-            betaArray, x_value = ErrorBars(X,z, lambdas[l])
+            betaArray, x_value = ErrorBars(X,z, lambdas[l], noiseadj)
             ax.plot(x_value,betaArray,lw=1,linestyle=':',marker='o', label= '$\lambda$ = %s'%lambdas[l])
 
     ax.legend(loc='upper center', bbox_to_anchor=(0.3, -0.09), fancybox=True, shadow=True, ncol=5)
@@ -246,7 +247,7 @@ def plott_errorbar(z , lambdas):
     plt.show()    
 
 #lambdas= [0.001, 0.01, 0.1, 0.2, 0.3]
-#plott_errorbar(z,lambdas)
+#plott_errorbar(z,lambdas, 1)
 
 ############ Error analysis ##################
 """print("Variance score R2 code: ", R2(z,z_tilde))
@@ -399,7 +400,7 @@ def Plot_nthPoly_regular( z, error, model, p, nlambdas, pol_LasRid):
     fig, axs = plt.subplots(nrow, ncol)
     fig.tight_layout()
     fig.text(0.5, 0.01, 'log10(lambdas)', ha='center')
-    fig.text(0.01, 0.5, 'MSE', va='center', rotation='vertical')
+    fig.text(0.01, 0.5, 'R2', va='center', rotation='vertical')
     
     
     for i, ax in enumerate(fig.axes):
@@ -458,7 +459,7 @@ def Plot_nthPoly_regular( z, error, model, p, nlambdas, pol_LasRid):
 
                 error_train_mean[l] = error_train_mean_l
                 error_test_mean[l] = error_test_mean_l
-        ind = np.argmax(error_test_mean)
+        ind = np.argmin(error_test_mean)
         print("noise: ", noiseadj[i])
         print("max lambda ", lambdas[ind])
         print("max lambda log ", np.log10(lambdas[ind]))
@@ -468,12 +469,12 @@ def Plot_nthPoly_regular( z, error, model, p, nlambdas, pol_LasRid):
         ax.plot(np.log10(lambdas), error_train_mean)
         ax.plot(np.log10(lambdas), error_test_mean)
         #ax.plot(complex, MSE_sci) np.log10(lambdas)
-        ax.legend(['MSE train mean','MSE test mean'], loc='upper left')
+        ax.legend(['R2 train mean','R2 test mean'], loc='lower left')
     
     
 
     plt.show()
-#Plot_nthPoly_regular(z, 'MSE', 'Ridge', 0, 500, 2)    
+#Plot_nthPoly_regular(z, 'MSE', 'Lasso', 0, 500, 2)    
 
 
 # Function plots the nth lambda for nth poly without resampling for different noises 
@@ -521,7 +522,7 @@ def Plot_nthLambda_nthPoly_Regular(z, error, noiseadj, p = 3, lamb = 0, model = 
     plt.ylabel('MSE')
     plt.show()
 
-Plot_nthLambda_nthPoly_Regular(z, 'MSE', 0.1, 5, 0.1, 'Lasso')
+#Plot_nthLambda_nthPoly_Regular(z, 'MSE', 0.1, 5, 0.1, 'Lasso')
 
 
 # Plotting the MSE or the R²-score for OLS of the nth polynomial with resampling 
@@ -567,7 +568,7 @@ def Plot_nthPoly_error_Mean(z,p, error): # p is max polynominal
 
 
 # This function plots the mean of k-folds MSE with respect to different lambdas, with given poly degree 
-def Plot_nthLambda_MSE_Mean(z,p, error, model, nlambdas):
+def Plot_nthLambda_error_Mean(z,p, error, model, nlambdas):
     
     lambdas = np.logspace(-8, 5, nlambdas)
 
@@ -612,7 +613,7 @@ def Plot_nthLambda_MSE_Mean(z,p, error, model, nlambdas):
     plt.show()
 
 
-#Plot_nthLambda_MSE_Mean(z,2, 'MSE', 'Lasso', 500)
+#Plot_nthLambda_error_Mean(z,2, 'MSE', 'Lasso', 500)
 
 #This function plots different lambdas for nth polynomial with resampling k-fold 
 def Plot_nthLambda_nthPoly(z, noiseadj, error, p = 3, lamb = 0, model = 'Ridge'):

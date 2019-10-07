@@ -55,27 +55,28 @@ def CreateDesignMatrix_X(x, y, n ):
     return X
 
 N = 20
-p = 15
+p = 10
 N_val = int(N) # for validation set
 seed = 140
 
 np.random.seed(seed)
+
 # create points
 x = np.sort(np.random.uniform(0,1,N))
 y = np.sort(np.random.uniform(0,1,N))
 x, y = np.meshgrid(x,y,sparse=False)
 
 #create validation set
-x_val =  x #np.sort(np.random.uniform(0,1,N_val))
-y_val = y  #np.sort(np.random.uniform(0,1,N_val))
-#x_val, y_val = np.meshgrid(x_val,y_val,sparse=False)    
+x_val =  x 
+y_val = y  
+ 
 
 #create datapoints/results
 z = FrankeFunction(x, y)
 z_val = FrankeFunction(x_val,y_val)
 
 # Create noise
-noiseadj = 0.001
+noiseadj = 1
 
 noise = noiseadj*np.random.randn(N,N)
 noise_val = noiseadj*np.random.randn(N_val,N_val)
@@ -99,10 +100,12 @@ error= np.zeros(p)
 bias =np.zeros(p)
 variance =np.zeros(p)
 
-lin = skl.Ridge(alpha = 1e-03, fit_intercept=False, normalize=True)
+lin = LinearRegression(fit_intercept=False)
+
 #skl.Ridge(alpha = 0.01, fit_intercept=False, normalize=True)
 #skl.Lasso(alpha=0.000, fit_intercept=False, normalize=True, tol=0.01)
 #LinearRegression(fit_intercept=False)
+
 for deg in range(1,p+1):
     
     X = CreateDesignMatrix_X(x,y,deg)
