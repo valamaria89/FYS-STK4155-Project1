@@ -18,6 +18,10 @@ from sklearn.model_selection import KFold
 from sklearn.model_selection import cross_val_score
 import sklearn.linear_model as skl
 
+#########################################
+"""Check bottom of page for description"""
+#########################################
+
 colors = ['#1f77b4', '#1f77b4', '#aec7e8','#aec7e8','#ff7f0e','#ff7f0e','#d62728','#d62728','#2ca02c','#2ca02c','#98df8a','#98df8a','#ffbb78','#ffbb78']
 # Load the terrain
 terrain = imread('SRTM_Oslo_Fjorden.tif')
@@ -25,15 +29,11 @@ terrain = imread('SRTM_Oslo_Fjorden.tif')
 # Show the terrain
 
 # plt.figure()
-# currentAxis = plt.gca()
-# currentAxis.add_patch(Rectangle((50,100),40,30,linewidth=1,edgecolor='r',facecolor='none'))
 # plt.title('Terrain over Oslo Fjorden')
 # plt.imshow(terrain, cmap='gray')
 # plt.xlabel('X')
 # plt.ylabel('Y')
 # plt.show()
-
-
 
 seed = 3001
 maxValue = np.amax(terrain)
@@ -42,19 +42,20 @@ random.seed(seed)
 
 ### Global variables
 def MapMaker(terrain, x_size, y_size):
-    x = np.linspace(0, 1, x_size)
-    y = np.linspace(0, 1, y_size)
-    x, y = np.meshgrid(x, y)
+    z = 0
+    while(np.all(z==0)):        ############# corrects for cuts with only water, see description
+        x = np.linspace(0, 1, x_size)
+        y = np.linspace(0, 1, y_size)
+        x, y = np.meshgrid(x, y)
 
-    # Pick a random cut of the map of certain size
-    col = random.randint(0,terrain.shape[1]-x_size)
-    row = random.randint(0,terrain.shape[0]-y_size)
-    cut = terrain[row:row+y_size, col:col+x_size]
-    z = cut
-    z = z.reshape(-1,1)
+        # Pick a random cut of the map of certain size
+        col = random.randint(0,terrain.shape[1]-x_size)
+        row = random.randint(0,terrain.shape[0]-y_size)
+        cut = terrain[row:row+y_size, col:col+x_size]
+        z = cut
+        z = z.reshape(-1,1)
     return z, x, y, col, row
 z,x_array,y_array = MapMaker(terrain, 40, 40)[0:3]
-
 
 
 def CreateDesignMatrix(x,y,p):
@@ -69,11 +70,39 @@ def beta(X,z,lamb = 0):
     z = np.ravel(z)
     return np.linalg.pinv(X.T.dot(X) + lamb * np.identity(X.shape[1])).dot(X.T.dot(z))
 
+def beta_special(X_train, z_train, lamb, model_skl, intercept):
+    if (model_skl != None):  ### for lasso scikit, working
+        if (not intercept):
+            if X_train.shape[1] <= 1:
+                model_skl.fit(X_train, z_train)
+                beta_train = np.asarray(model_skl.intercept_)
+            else:
+                X_no_train = X_train[:, 1:]
+                model_skl.fit(X_no_train, z_train)
+                beta_train = np.insert(model_skl.coef_, 0, model_skl.intercept_)
+        else:
+            model_skl.fit(X_train, z_train)
+            beta_train = model_skl.coef_
+
+    elif (model_skl == None):  ### for ridge and ols homemade
+        if (not intercept):
+            if (X_train.shape[1] <= 1):
+                beta_train = np.mean(z_train)
+            else:
+                X_no_train = X_train[:, 1:]
+                beta_train = beta(X_no_train, z_train, lamb)
+                beta_train = np.insert(beta_train, 0, np.mean(z_train))
+        else:
+            beta_train = beta(X_train, z_train, lamb)
+    return beta_train
+
+
 def Variance_Bias_Analysis(X, z, z_tilde, lamb = 0, betas = None, result = 'Errorbar', confidence = 0.95):
 
     if betas.all() == None:
         z = z.reshape(-1, 1)
         betas = beta(X,z, lamb)
+    print (z-z_tilde)
     variance_z = (np.sum(z-z_tilde)**2)/(len(z)-len(betas)-1)
     Variance_Beta = np.diag(variance_z * np.linalg.pinv(X.T.dot(X)))
     SD_array = np.sqrt(Variance_Beta)
@@ -139,18 +168,7 @@ def Kfold(X, z, lamb = 0, model_skl =None, intercept = True):
         X_test = X_k[i]
         z_test = z_k[i]
 
-        if (model_skl != None):  ### for lasso
-            if(intercept == False and X_train.shape[1]>1):
-                X_no_train = X_train[:, 1:]
-                model_skl.fit(X_no_train, z_train)
-                beta_train = model_skl.coef_
-                beta_train = np.insert(beta_train, 0, model_skl.intercept_)
-
-            else:
-                model_skl.fit(X_train, z_train)
-                beta_train = model_skl.coef_
-        else: beta_train = beta(X_train, z_train, lamb)
-
+        beta_train = beta_special(X_train, z_train, lamb, model_skl, intercept)
         z_tilde = X_train.dot(beta_train)
         z_predict = X_test.dot(beta_train)
 
@@ -168,16 +186,19 @@ def Kfold(X, z, lamb = 0, model_skl =None, intercept = True):
 
 def Regression(z, p = 3,lamb = 0, model = 'OLS', resampling = 'kfold', error ='MSE', x = x_array, y = y_array, intercept = True):
     X = CreateDesignMatrix(x,y,p)
+    # print("polynomial: ", p, " Determinant: ", np.linalg.det(X.T.dot(X)))
 
     if (model == 'OLS' or model == 'Ridge'):
         if model == 'OLS': lamb = 0
 
-        betas = beta(X, z, lamb)
-
-        #print("polynomial: ", p, " Determinant: ", np.linalg.det(X.T.dot(X)))
-        z_tilde = X.dot(betas)
-
         if resampling == 'none':
+            if (intercept):
+                betas = beta(X, z, lamb)
+            else:
+                X_no = X[:, 1:]
+                betas = beta(X_no, z, lamb)
+                betas = np.insert(betas, 0, np.mean(z))
+            z_tilde = X.dot(betas)
             MSE, R2 = Error_Analysis(z, z_tilde, "MSE and R2")
             var_betas = Variance_Bias_Analysis(X, z, z_tilde, lamb, result='Variance', betas=betas)
             return MSE, R2, var_betas, betas, z_tilde
@@ -185,18 +206,18 @@ def Regression(z, p = 3,lamb = 0, model = 'OLS', resampling = 'kfold', error ='M
             return Kfold(X,z, lamb, intercept=intercept)
 
     if model == 'Lasso':  # Here we used scikit learn
-        if intercept == False: fitinter = True
-        else: fitinter = False
-        model_lasso = skl.Lasso(alpha=lamb, fit_intercept=fitinter, normalize=True,tol=6000)
+        if intercept: fit_intercept_bool = False
+        else: fit_intercept_bool = True
+        model_lasso = skl.Lasso(alpha=lamb, fit_intercept=fit_intercept_bool, normalize=True,tol=6000)
 
         if resampling == 'none':
-            model_lasso.fit(X, z)
-            if intercept == False:
+            if (intercept):
+                model_lasso.fit(X, z)
+                betas = model_lasso.coef_
+            else:
                 X_no = X[:, 1:]
                 model_lasso.fit(X_no, z)
-                betas = model_lasso.coef_
-                betas = np.insert(betas, 0, model_lasso.intercept_)
-            else: betas = model_lasso.coef_
+                betas = np.insert(model_lasso.coef_, 0, model_lasso.intercept_)
             z_tilde = X.dot(betas)
             MSE, R2 = Error_Analysis(z, z_tilde, "MSE and R2")
             var_betas = Variance_Bias_Analysis(X, z, z_tilde, lamb, result='Variance', betas=betas)
@@ -328,7 +349,7 @@ def plotting(z, p = 3, lamb = 0, model = 'OLS', resampling = 'kfold', error = 'M
 
 
 #### best_fit ### finds the best function with best MSE given lambda and poly ####
-def best_fit(z, maxpoly = 50, maxlamb = 1, model = 'Ridge', intercept = True, x=x_array, y=y_array):
+def best_fit(z, maxpoly = 30, maxlamb = 1, model = 'Ridge', intercept = True, x=x_array, y=y_array):
     if model == 'OLS':
         poptimal = plotting(z, maxpoly, 0, model="OLS", resampling='kfold', plot='polynomial', find_optimal=True, x=x, y=y)
         return poptimal
@@ -356,10 +377,10 @@ def best_fit(z, maxpoly = 50, maxlamb = 1, model = 'Ridge', intercept = True, x=
 
 #### This function plots all the terrain plots, prints out to text, and runs the best fit function if bestfit=True ####
 colors2 = ['#5D8AA8','#E32636','#9966CC','#008000','#00FFFF','#FDEE00']
-def surface_plotting(terrain, maxpoly, lamb=0, model='OLS', num_cuts=3, xsize = 20, ysize = 20, title = '',intercept = True, start_cut = 0, bestfit =  True, textnum=''):
+def surface_plotting(terrain, maxpoly, lamb=1, model='OLS', num_cuts=3, xsize = 20, ysize = 20, title = '',intercept = True, start_cut = 0, bestfit =  True, textnum=''):
     model_text = model + textnum
     with open("%s values for terrain data.txt"%model_text, "a") as f:
-        if bestfit == False: print("**** %s ****"%model,"\npolynomial = %s"%p,"\nlambda = %s"%lamb, file=f)
+        if bestfit == False: print("**** %s ****"%model,"\npolynomial = %s"%maxpoly,"\nlambda = %s"%lamb, file=f)
         else: print("**** %s ****"%model, file=f)
     fig, axs = plt.subplots(num_cuts, 2, subplot_kw={'projection': '3d'})
     plt.subplots_adjust(hspace=0.8)
@@ -373,10 +394,13 @@ def surface_plotting(terrain, maxpoly, lamb=0, model='OLS', num_cuts=3, xsize = 
 
         if bestfit == True:
             if model == 'OLS':
-                p = best_fit(terrain_cut, x = x_array_plt, y = y_array_plt, model=model, maxpoly = maxpoly)
+                p = best_fit(terrain_cut, x = x_array_plt, y = y_array_plt, model=model, maxpoly = maxpoly,intercept=intercept, maxlamb =lamb)
                 lamb = 0
             else:
-                p, lamb = best_fit(terrain_cut, x = x_array_plt, y = y_array_plt, model=model, maxpoly = maxpoly)
+                p, lamb = best_fit(terrain_cut, x = x_array_plt, y = y_array_plt, model=model, maxpoly = maxpoly, intercept=intercept, maxlamb =lamb)
+        else:
+            p = maxpoly
+            lamb = lamb
         with open("%s values for terrain data.txt" % model_text, "a") as f:
             print("\nTerrain cut %s\n" % (num_cut + 1), file=f)
             print("\npolynomial = %s" % p, "\nlambda = %s\n" % lamb, file=f)
@@ -424,8 +448,51 @@ def surface_plotting(terrain, maxpoly, lamb=0, model='OLS', num_cuts=3, xsize = 
     plt.show()
 
 
-#### These plots the terrain cuts of min MSE
-# surface_plotting(terrain,30,model='Lasso', title ='OLS regression', xsize=40, ysize=40, num_cuts=3, intercept=True, start_cut=0, textnum='1')
-# surface_plotting(terrain,30,model='Lasso', title ='OLS regression', xsize=40, ysize=40, num_cuts=3, intercept=True, start_cut=3, textnum='2')
+"""
+Surface_plotting
+**************************
+This function finds the best model of a cut of terrain, given lambda and polynomial degree, and then plots 3d figure(s) of the model(s)
 
+**
+### Parameters ###
+bestfit: If this one is set to True then surface_plotting checks through best_fit() which model is the best with respect to lambda and poly. If this parameter is False then you can plot normally. Where lamb and maxpol are not longer max values in a range
+terrain: loaded up on top of the page
+maxpoly: the upperlimit to which polynomials you'd like to check as the best suited model(given poly and lambda). (Just single poly if bestfit is False)
+model: Pick between 'Ridge', 'Lasso' and 'OLS'
+num_cuts: the number of cuts/patches you want to check for best model, and plot together.
+start_cut: this is just so the numbering of the plots starts where you'd like
+textnum: a text to add to your .txt title(it takes model='' already)
+lamb: if you want to set the maximum lambda(or just lambda if bestfit is False). The lower limit is default at e-16 but can be changed in plotting() => if(lambdas)
 
+** 
+The surfaceplotting(bestfit=True) runs through the best_fit() which for model='Ridge' and 'Lasso' then runs further through plotting() => if(lambdas) which then checks the best polynomial.
+
+** 
+All the functions in plotting() can be used separately to plot MSE/R2(lambda), MSE/R2(poly), MSE/R2(lambda,poly), named respectively plot='lambdas', plot='polynomial' and plot='lambdas polynomial'
+If model='OLS' it will run through plotting() => if(polynomial) instead.
+
+** 
+intercept(Usable for Lasso): If intercept is False, this means removing the intercept column in regression with/without resampling. Where the removal happens inside the kfold for with resampling.
+for intercept=False => Lasso(set_intercept=True) as the intercept value calculated by Lasso is inserted.
+If intercept is True then it's business as usual with no column removal. It will also set Lasso(set_intercept=False)
+If intercept is False for Ridge then a code that tries to emulate the one that includes scikit learn will run, but this code produces very bad results.
+
+**
+Water level cuts, meaning z being only zeros. As this is just a flat plane it's not very interesting for regression analysis.
+It also avoids R2 ConvergenceWarning as a consquence of all zeros.
+"""
+
+"""def surface_plotting(terrain, maxpoly, lamb=0, model='OLS', num_cuts=3, xsize = 20, ysize = 20, title = '',intercept = True, start_cut = 0, bestfit =  True, textnum=''):"""
+### bestfit = True ###
+### don't use lambda = 0, its being log'ed ###
+# surface_plotting(terrain,30,model='Ridge', title ='Ridge regression', xsize=40, ysize=40, num_cuts=3, intercept=True, start_cut=0, textnum='_13_TEST')
+# surface_plotting(terrain,30,model='Ridge', title ='Ridge regression', xsize=40, ysize=40, num_cuts=3, intercept=True, start_cut=3, textnum='_46_TEST')
+
+### bestfit = False ###
+# surface_plotting(terrain,30,lamb=0.000001,model='Lasso', title ='OLS regression', xsize=40, ysize=40, num_cuts=1, intercept=True, start_cut=0, textnum='1',bestfit=False)
+
+#### intercept = False (Lasso)  ####### bestfit = True ####
+# surface_plotting(terrain,30,model='Lasso', title ='Lasso regression', xsize=40, ysize=40, num_cuts=3, intercept=False, start_cut=0, textnum='_withoutintercept13')
+# surface_plotting(terrain,30,model='Lasso', title ='Lasso regression', xsize=40, ysize=40, num_cuts=3, intercept=False, start_cut=3, textnum='_withoutintercept46')
+# surface_plotting(terrain,30,model='Lasso', title ='Lasso regression', xsize=40, ysize=40, num_cuts=3, intercept=True, start_cut=0, textnum='_intercept13')
+# surface_plotting(terrain,30,model='Ridge', title ='Ridge regression', xsize=40, ysize=40, num_cuts=3, intercept=True, start_cut=3, textnum='_intercept46')
