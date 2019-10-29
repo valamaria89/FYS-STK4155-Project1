@@ -10,8 +10,10 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.metrics import confusion_matrix, accuracy_score, roc_auc_score
+from sklearn.metrics import confusion_matrix, accuracy_score, roc_auc_score, roc_curve, auc
 from sklearn.linear_model import LogisticRegression
+import matplotlib.pyplot as plt
+from functools import partial
 
 # Trying to set the seed
 
@@ -28,6 +30,7 @@ pd.set_option('display.max_colwidth', -1)
 # Reading file into data frame
 cwd = os.getcwd()
 filename = cwd + '/default of credit card clients.xls'
+# filename = cwd + '/test.xls'
 nanDict = {}
 df = pd.read_excel(filename, header=1, skiprows=0, index_col=0, na_values=nanDict)
 df.rename(index=str, columns={"default payment next month": "defaultPaymentNextMonth"}, inplace=True)
@@ -86,6 +89,12 @@ print("Non-Default: ", no_perc)
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=seed)
 
+
+scaler = StandardScaler()
+scaler.fit(X_train)
+X_train_scaled = scaler.transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
 # Categorical variables to one-hot's
 """onehotencoder = OneHotEncoder(categories="auto") #What does auto do ? 
 
@@ -139,49 +148,155 @@ df = df.drop(df[(df.BILL_AMT1 == 0) &
 
 ############ Logistic Regression with Gradient Descent ##################
 
-eta = 1e-08 #Learning rate 
-n_iter = 100
+eta = 1e-5 #Learning rate
+
+n_iter = 450
 #XTrain = np.c_[np.ones((XTrain.shape[0], 1)), XTrain]
 #yTrain = yTrain[:, np.newaxis]
-beta =np.random.randn(X_train.shape[1],1)*0.1
-#print(beta.shape)
-#print(yTrain.shape)
+beta_init = np.random.randn(X_train.shape[1],1)
+# print(beta_init)
 
-
+#print(X_train_scaled)
 #logrec = LogisticRegression()
 #logrec.fit(XTrain,yTrain)
 #print(logrec.coef_)
 
 def sigmoid(X, beta):
-    #print(X.shape)
-    #print(beta.shape)
+
     t = np.dot(X,beta)
-    return 1/(1+np.exp(-t))
+    siggy = np.array(1 / (1 + np.exp(-t)),dtype=np.float128)
+    return siggy
 
-def gradient_descent( X, y, beta, tol): 
-    #m = X.shape[0] 
-    for iter in range(n_iter):
-        gradient = (X.T.dot(y - sigmoid(X, beta)))
-        beta -= eta*gradient
-        norm = np.linalg.norm(gradient)
-        #print(beta[10])
-        if (norm < tol):
-            print("GD donezzz")
-            break
-        
-    return beta        #Is this code making sense? 
+# def gradient_descent( X, y, beta, tol):
+#     m = X.shape[0]
+    # for iter in range(n_iter):
+    #     gradient = (X.T.dot(y - sigmoid(X, beta)))
+    #     beta -= eta*gradient
+        # norm = np.linalg.norm(gradient)
+        # if (norm < tol):
+        #     print("GD donezzz")
+        #     break
+    #
+    # return beta        #Is this code making sense?
 
-beta = gradient_descent(X_train, y_train, beta, 1e-04)
-print(beta)
+class Weight:
 
-def cost_function(X, y, beta):
-    #Computes the cost function for all the training samples
-    #m = X.shape[0]
-    cost_func = -np.sum(y*np.log(sigmoid(X,beta)) + (1-y)* np.log(1-sigmoid(X, beta)))
-    return cost_func
+    def __init__(self, X, y, beta, eta, iterations = 500):
+        self.X = X
+        self.y = y
+        self.beta = beta
+        self.eta = eta
+        self.n = iterations
+
+    def gradient_descent(self):
+        gradient = -(self.X.T.dot(self.y - sigmoid(self.X, self.beta)))
+        self.beta -= self.eta * gradient
+        return self.beta
+
+    def newtons_method(self):
+        W = np.zeros(self.X.shape[0],self.X.shape[0])
+        for i in range(len(self.X.shape[0])):
+            np.fill_diagonal(W, sigmoid(self.X,self.beta) @ (1-sigmoid(self.X, self.beta)))
+        beta = self.beta - np.linalg.pinv(self.X.T @ W @ self.X) @ (-self.X.T @ (self.y - sigmoid(self.X, self.beta)))
+        return beta
+
+    def cost_function(self):
+        return -np.sum(self.y * np.log(sigmoid(self.X, self.beta)) + (1 - self.y) * np.log(1 - sigmoid(self.X, self.beta))) / (len(self.y))
+
+    def train(self, method):
+        cost_all = np.array([])
+        for i in range(self.n):
+            self.beta = method
+            # self.beta = self.gradient_descent()
+            print(self.beta)
+            cost_current = self.cost_function()
+            cost_all = np.append(cost_all, cost_current)
+        return betas, cost_all
+
+
+# def new_weight(X, y, beta, eta):
+#     gradient = -(X.T.dot(y - sigmoid(X, beta)))
+#     beta -= eta * gradient
+#     return beta, gradient
+#
+# def cost_function(X, y, beta):
+#     Computes the cost function for all the training samples
+    # cost_func = -np.sum(y*np.log(sigmoid(X,beta), dtype=np.float128) + (1-y)* np.log(1-sigmoid(X, beta),dtype=np.float128))/(len(y))
+    # return cost_func
+
+# def train(X, y, beta, eta, n_iter):
+#     cost_all = np.array([])
+#
+#     for i in range(n_iter):
+#         betas, gradient = new_weight(X, y, beta, eta)
+        # w = Weight(X,y,beta,eta)
+        # betas, gradient = w.gradient_descent()
+        # norm = np.linalg.norm(gradient)
+        # cost_current = cost_function(X, y, betas)
+        # cost_all = np.append(cost_all,cost_current)
+    #
+    # return betas, cost_all
 
 
 
+def classification(X, betas, y_test=[0]):
+    prob = sigmoid(X,betas)
+    tot = 0
+    y_pred = np.zeros(X.shape[0])
+    for i in range(len(y_pred)):
+        if prob[i] >= .5:
+            y_pred[i] =1
+        else:
+            y_pred[i] = 0
+        if ( np.sum(y_test) != 0 and y_pred[i] == y_test[i]):
+            tot += 1
+
+    return prob, y_pred, tot/len(y_pred)
+
+
+#final_betas, cost_all = train(X_train_scaled, y_train, beta_init, eta, n_iter, 1e-04)
+# print(classification(X_train_scaled,final_betas))
+#epoch = np.arange(len(cost_all))
+#prob, y_pred, accuracy = classification(X_test_scaled, final_betas, y_test)
+#false_pos, true_pos = roc_curve(y_test, prob)[0:2]
+
+
+
+def Plots(costfunc_plot, LR_plot, ROC_plot):
+    w = Weight(X_train_scaled,y_train,beta_init,eta)
+    if (costfunc_plot == 1):
+        cost_all = w.train(w.gradient_descent)
+        epoch = np.arange(len(cost_all))
+        plt.plot(epoch, cost_all)
+        plt.show()
+
+    elif (LR_plot == 1):
+        final_betas = train(X_train_scaled, y_train, beta_init, eta, n_iter, 1e-04)[0]
+        prob_train = classification(X_train_scaled, final_betas)[0]
+        x_sigmoid = np.dot(X_train_scaled, final_betas)
+        plt.scatter(x_sigmoid, prob_train)
+        plt.show()
+
+    elif (ROC_plot==1):
+        final_betas= train(X_train_scaled, y_train, beta_init, eta, n_iter, 1e-04)[0]
+        prob, y_pred = classification(X_test_scaled, final_betas, y_test)[0:2]
+        false_pos, true_pos = roc_curve(y_test, prob)[0:2]
+        plt.plot([0, 1], [0, 1], "k--")
+        plt.plot(false_pos, true_pos)
+        plt.xlabel("False Positive rate")
+        plt.ylabel("True Positive rate")
+        plt.title("ROC curve gradient descent")
+        plt.show()
+
+
+Plots(1, 0, 0)
+#ConfMatrix = confusion_matrix(y, y_pred)
+
+# plt.scatter(x_sigmoid,prob)
+# plt.show()
+# plt.plot(epoch,cost_all)
+# plt.show()
+
+# print(train(X, y, beta_init, eta, n_iter, 1e-04))
 #parameters = best_fit(XTrain, yTrain, beta)       
-
-
+# np.column_stack((prob,default))
