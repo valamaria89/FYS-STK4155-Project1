@@ -163,7 +163,7 @@ beta_init = np.random.randn(X_train.shape[1],1)
 
 def sigmoid(X, beta):
 
-    t = np.dot(X,beta)
+    t = X @ beta
     siggy = np.array(1 / (1 + np.exp(-t)),dtype=np.float128)
     return siggy
 
@@ -188,12 +188,14 @@ class Weight:
         self.X_all = X
         self.beta = beta
         self.eta = eta
-        self.n = iterations
-        self.e = 0
+        self.iterations = iterations
+        self.epoch = 0
+        self.cost = np.array([])
 
     def gradient_descent(self):
         gradient = -(self.X.T.dot(self.y - sigmoid(self.X, self.beta)))
         self.beta -= self.eta * gradient
+        self.cost = self.cost_function()
         return self.beta
 
     def newtons_method(self):
@@ -204,24 +206,26 @@ class Weight:
         return self.beta
 
     def learning_schedule(self, t):
-        t0, t1 = 1, self.n
+        t0, t1 = 1, self.iterations
         return t0/(t+t1)
-        
-    def stochastick_gradient(self):
 
-        M = 50
-        m = int(self.X_all.shape[0]/M)
+    def shuffle(self):
         shuffle_ind = np.arange(self.X_all.shape[0])
+        # np.random.seed(seed)
         np.random.shuffle(shuffle_ind)
 
         Xshuffled = np.zeros(self.X_all.shape)
         yshuffled = np.zeros(self.y_all.shape)
         for ind in range(self.X_all.shape[0]):
-
             Xshuffled[ind] = self.X_all[shuffle_ind[ind]]
             yshuffled[ind] = self.y_all[shuffle_ind[ind]]
+        return Xshuffled, yshuffled
+        
+    def mini_batch_gradient_descent(self):
 
-   
+        M = 32
+        m = int(self.X_all.shape[0]/M)
+        Xshuffled, yshuffled = self.shuffle()
         X_b = np.split(Xshuffled, m)
         y_b = np.split(yshuffled, m)
      
@@ -229,37 +233,26 @@ class Weight:
             
             self.X = X_b[i]
             self.y = y_b[i]
-            
-            
+            gradient = -(self.X.T @ (self.y - sigmoid(self.X, self.beta)))
+            self.eta = self.learning_schedule((self.epoch*m+i)*1)
+            print(i)
+            print(self.eta)
+            self.beta -=  (self.eta*gradient)
+            self.cost = np.append(self.cost, self.cost_function())
 
-            gradient = -(self.X.T.dot(self.y - sigmoid(self.X, self.beta)))
-            #print(gradient)
-            #print((self.gradient_descent()).shape)
-            #print(self.eta)
-            self.eta = self.learning_schedule((self.e*m+i)*1)
-            self.beta -=  self.eta*gradient
-            self.beta /=m
-            #print(self.beta)
-        #self.beta = np.linalg.norm(self.beta)
-                
-        return self.beta      
+        return self.beta
 
     def cost_function(self):
         return -np.sum(self.y * np.log(sigmoid(self.X, self.beta)) + (1 - self.y) * np.log(1 - sigmoid(self.X, self.beta))) / (len(self.y))
 
     def train(self, method):
-        cost_all = np.array([])
-        for i in range(self.n):
-            self.e = i
+        self.cost_all = np.array([])
+        for i in range(self.iterations):
+            self.epoch = i
             self.beta = method()
-            #print(self.beta)
-            # self.beta = self.gradient_descent()
-            #print(self.beta)
-            cost_current = self.cost_function()
-            #print(cost_current)
-            cost_all = np.append(cost_all, cost_current)
-            #print(cost_all)
-        return self.beta, cost_all 
+            self.cost_all = np.append(self.cost_all, self.cost)
+
+        return self.beta, self.cost_all
 
 
 # def new_weight(X, y, beta, eta):
@@ -310,8 +303,8 @@ def classification(X, betas, y_test=[0]):
 
 
 
-def Plots(costfunc_plot, LR_plot, ROC_plot, StockG):
-    w = Weight(X_train_scaled,y_train,beta_init,eta, 100)
+def Plots(costfunc_plot, LR_plot, ROC_plot, MB_GD_plot):
+    w = Weight(X_train_scaled,y_train,beta_init,eta, 2)
     if (costfunc_plot == 1):
         _,cost_all = w.train( w.gradient_descent)
         epoch = np.arange(len(cost_all))
@@ -336,10 +329,10 @@ def Plots(costfunc_plot, LR_plot, ROC_plot, StockG):
         plt.title("ROC curve gradient descent")
         plt.show()
 
-    elif (StockG == 1):
-        _,cost_all = w.train(w.stochastick_gradient)
-        epoch = np.arange(len(cost_all))
-        plt.plot(epoch, cost_all)
+    elif (MB_GD_plot == 1):
+        _,cost_all = w.train(w.mini_batch_gradient_descent)
+        batch = np.arange(len(cost_all))
+        plt.plot(batch, cost_all)
         plt.show()
 
 
