@@ -154,7 +154,7 @@ eta = 0.0001 #Learning rate
 #XTrain = np.c_[np.ones((XTrain.shape[0], 1)), XTrain]
 #yTrain = yTrain[:, np.newaxis]
 beta_init = np.random.randn(X_train.shape[1],1)
-# print(beta_init)
+#print(beta_init.shape)
 
 #print(X_train_scaled)
 #logrec = LogisticRegression()
@@ -190,7 +190,7 @@ class Weight:
         self.eta = eta
         self.iterations = iterations
         self.epoch = 0
-        self.cost = np.array([])
+        #self.cost = np.array([])
 
     def gradient_descent(self):
         gradient = -(self.X.T.dot(self.y - sigmoid(self.X, self.beta)))
@@ -206,12 +206,12 @@ class Weight:
         return self.beta
 
     def learning_schedule(self, t):
-        t0, t1 = 1, self.iterations
+        t0, t1 = 120, 12000#self.iterations
         return t0/(t+t1)
 
     def shuffle(self):
         shuffle_ind = np.arange(self.X_all.shape[0])
-        # np.random.seed(seed)
+        
         np.random.shuffle(shuffle_ind)
 
         Xshuffled = np.zeros(self.X_all.shape)
@@ -222,25 +222,51 @@ class Weight:
         return Xshuffled, yshuffled
         
     def mini_batch_gradient_descent(self):
-
         M = 32
         m = int(self.X_all.shape[0]/M)
+        
         Xshuffled, yshuffled = self.shuffle()
         X_b = np.split(Xshuffled, m)
         y_b = np.split(yshuffled, m)
-     
+
+        
+        self.cost = np.array([])
         for i in range(m):
-            
+            #print(X_b[i].shape)
             self.X = X_b[i]
+            #print(self.X.shape)
             self.y = y_b[i]
+            
             gradient = -(self.X.T @ (self.y - sigmoid(self.X, self.beta)))
             self.eta = self.learning_schedule((self.epoch*m+i)*1)
-            print(i)
-            print(self.eta)
+            #print(i)
+            #print(self.eta)
             self.beta -=  (self.eta*gradient)
             self.cost = np.append(self.cost, self.cost_function())
 
         return self.beta
+
+    def stochastic_gradient_descent(self):
+        m = len(self.y_all)
+        #random.seed(seed)
+        Xshuffled, yshuffled = self.shuffle()
+        """ X_b = np.split(Xshuffled, m)
+        y_b = np.split(yshuffled, m)
+        print(X_b.shape)
+        X_b = np.concatenate(X_b)
+        y_b = np.concatenate(y_b)"""
+        
+        self.cost = np.array([])
+        for i in range(m):
+
+            self.X = Xshuffled[i:i+1,:]
+            self.y = yshuffled[i:i+1,:]
+            gradient = -(self.X.T @ (self.y - sigmoid(self.X, self.beta)))
+            self.eta = self.learning_schedule((self.epoch*m+i)*1)
+            self.beta -=  self.eta*gradient
+            self.cost = np.append(self.cost, self.cost_function())
+
+        return self.beta    
 
     def cost_function(self):
         return -np.sum(self.y * np.log(sigmoid(self.X, self.beta)) + (1 - self.y) * np.log(1 - sigmoid(self.X, self.beta))) / (len(self.y))
@@ -251,7 +277,7 @@ class Weight:
             self.epoch = i
             self.beta = method()
             self.cost_all = np.append(self.cost_all, self.cost)
-
+           # print(self.cost_all)
         return self.beta, self.cost_all
 
 
@@ -303,8 +329,8 @@ def classification(X, betas, y_test=[0]):
 
 
 
-def Plots(costfunc_plot, LR_plot, ROC_plot, MB_GD_plot):
-    w = Weight(X_train_scaled,y_train,beta_init,eta, 2)
+def Plots(costfunc_plot, LR_plot, ROC_plot, MB_GD_plot, Stoch_GD_plot):
+    w = Weight(X_train_scaled,y_train,beta_init,eta, 1)
     if (costfunc_plot == 1):
         _,cost_all = w.train( w.gradient_descent)
         epoch = np.arange(len(cost_all))
@@ -319,11 +345,26 @@ def Plots(costfunc_plot, LR_plot, ROC_plot, MB_GD_plot):
         plt.show()
 
     elif (ROC_plot==1):
-        final_betas,_ = w.train(w.gradient_descent)
-        prob, y_pred = classification(X_test_scaled, final_betas, y_test)[0:2]
-        false_pos, true_pos = roc_curve(y_test, prob)[0:2]
+        final_betas_grad,_ = w.train(w.gradient_descent)
+        prob_grad, y_pred_grad = classification(X_test_scaled, final_betas_grad, y_test)[0:2]
+        false_pos_grad, true_pos_grad = roc_curve(y_test, prob_grad)[0:2]
+        print("Area under curve gradient: ", auc(false_pos_grad, true_pos_grad))
+        
+        final_betas_MB,_ = w.train(w.mini_batch_gradient_descent)
+        prob_MB, y_pred_MB = classification(X_test_scaled,final_betas_MB, y_test)[0:2]
+        false_pos_MB, true_pos_MB = roc_curve(y_test, prob_MB)[0:2]
+        print("Area under curve MB: ", auc(false_pos_MB, true_pos_MB))
+
+        final_betas_ST,_ = w.train(w.stochastic_gradient_descent)
+        prob_ST, y_pred_ST = classification(X_test_scaled,final_betas_ST, y_test)[0:2]
+        false_pos_ST, true_pos_ST = roc_curve(y_test, prob_ST)[0:2]
+        print("Area under curve ST: ", auc(false_pos_ST, true_pos_ST))
+
         plt.plot([0, 1], [0, 1], "k--")
-        plt.plot(false_pos, true_pos)
+        plt.plot(false_pos_grad, true_pos_grad,label="Gradient")
+        plt.plot(false_pos_ST, true_pos_ST, label="Stoch")
+        plt.plot(false_pos_MB, true_pos_MB, label="Mini")
+        plt.legend()
         plt.xlabel("False Positive rate")
         plt.ylabel("True Positive rate")
         plt.title("ROC curve gradient descent")
@@ -332,13 +373,21 @@ def Plots(costfunc_plot, LR_plot, ROC_plot, MB_GD_plot):
     elif (MB_GD_plot == 1):
         _,cost_all = w.train(w.mini_batch_gradient_descent)
         batch = np.arange(len(cost_all))
+        
         plt.plot(batch, cost_all)
         plt.show()
 
+    elif (Stoch_GD_plot == 1):
+        _,cost_all = w.train(w.stochastic_gradient_descent)
+        batch = np.arange(len(cost_all))
+        
+        plt.plot(batch, cost_all)
+        plt.show()    
 
 
 
-Plots(0, 0, 0, 1)
+
+Plots(0, 0, 1, 0, 0)
 #ConfMatrix = confusion_matrix(y, y_pred)
 
 # plt.scatter(x_sigmoid,prob)
