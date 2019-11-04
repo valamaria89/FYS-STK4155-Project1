@@ -58,6 +58,15 @@ scaler.fit(X_train)
 X_train_scaled = scaler.transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 
+def to_categorical_numpy(integer_vector):
+    n_inputs = len(integer_vector)
+    n_categories = np.max(integer_vector) + 1
+    onehot_vector = np.zeros((n_inputs, n_categories))
+    onehot_vector[range(n_inputs), integer_vector] = 1
+
+    return onehot_vector
+
+y_train_onehot, y_test_onehot = to_categorical_numpy(y_train), to_categorical_numpy(y_test)
 
 class NeuralNetworkTensorflow:
     def __init__(
@@ -201,25 +210,26 @@ A graph contains tensors and operations. To initiate a graph, a session is creat
 
 epochs = 2
 batch_size = 100
-eta = 0.01
-lmbd = 0.01
+#eta = 0.01
+#lmbd = 0.01
 n_neurons_layer1 = 10
 n_neurons_layer2 = 5
-n_categories = 1
-eta_vals = [1e-6, 1e-4, 1e-2, 1e-1,1]#np.logspace(-5, 1, 7)
-lmbd_vals =[1e-6, 1e-4, 1e-2, 1e-1,1]
+n_categories = 2
+eta_vals = np.logspace(-5, 1, 7) #[1e-6, 1e-4, 1e-2, 1e-1,1]#np.logspace(-5, 1, 7)
+lmbd_vals = np.logspace(-5, 1, 7) #[1e-6, 1e-4, 1e-2, 1e-1,1]
 
 DNN_tf = np.zeros((len(eta_vals), len(lmbd_vals)), dtype=object)
 
 for i, eta in enumerate(eta_vals):
     for j, lmbd in enumerate(lmbd_vals):
-        DNN = NeuralNetworkTensorflow(X_train_scaled, y_train, X_test_scaled, y_test, n_neurons_layer1=n_neurons_layer1,
+        DNN = NeuralNetworkTensorflow(X_train_scaled, y_train_onehot, X_test_scaled, y_test_onehot, n_neurons_layer1=n_neurons_layer1,
                                       n_neurons_layer2=n_neurons_layer2,
                                       n_categories=n_categories, epochs=epochs, batch_size=batch_size, eta=eta,
                                       lmbd=lmbd)
         DNN.fit()
 
         DNN_tf[i][j] = DNN
+        print(DNN)
 
         print("Learning rate = ", eta)
         print("Lambda = ", lmbd)
