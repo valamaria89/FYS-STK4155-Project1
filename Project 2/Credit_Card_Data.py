@@ -12,6 +12,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.metrics import confusion_matrix, accuracy_score, roc_auc_score, roc_curve, auc
 from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import SGDClassifier
 import matplotlib.pyplot as plt
 from functools import partial
 
@@ -167,18 +168,6 @@ def sigmoid(X, beta):
     siggy = np.array(1 / (1 + np.exp(-t)),dtype=np.float128)
     return siggy
 
-# def gradient_descent( X, y, beta, tol):
-#     m = X.shape[0]
-    # for iter in range(n_iter):
-    #     gradient = (X.T.dot(y - sigmoid(X, beta)))
-    #     beta -= eta*gradient
-        # norm = np.linalg.norm(gradient)
-        # if (norm < tol):
-        #     print("GD donezzz")
-        #     break
-    #
-    # return beta        #Is this code making sense?
-
 class Weight:
 
     def __init__(self, X, y, beta, eta, iterations = 500):
@@ -199,10 +188,11 @@ class Weight:
         return self.beta
 
     def newtons_method(self):
-        W = np.zeros(self.X.shape[0],self.X.shape[0])
-        for i in range(len(self.X.shape[0])):
-            np.fill_diagonal(W, sigmoid(self.X,self.beta) @ (1-sigmoid(self.X, self.beta)))
-            self.beta = self.beta - np.linalg.pinv(self.X.T @ W @ self.X) @ (-self.X.T @ (self.y - sigmoid(self.X, self.beta)))
+        W = np.zeros((self.X.shape[0],self.X.shape[0]))
+        for i in range(self.X.shape[0]):
+            W[i][i] = (sigmoid(self.X[i],self.beta)) @ (1-sigmoid(self.X[i], self.beta))
+        self.beta = self.beta - np.linalg.pinv(self.X.T @ W @ self.X) @ (-self.X.T @ (self.y - sigmoid(self.X, self.beta)))
+        self.cost = self.cost_function()
         return self.beta
 
     def learning_schedule(self, t):
@@ -232,15 +222,11 @@ class Weight:
         
         self.cost = np.array([])
         for i in range(m):
-            #print(X_b[i].shape)
             self.X = X_b[i]
-            #print(self.X.shape)
             self.y = y_b[i]
             
             gradient = -(self.X.T @ (self.y - sigmoid(self.X, self.beta)))
             self.eta = self.learning_schedule((self.epoch*m+i)*1)
-            #print(i)
-            #print(self.eta)
             self.beta -=  (self.eta*gradient)
             self.cost = np.append(self.cost, self.cost_function())
 
@@ -250,11 +236,6 @@ class Weight:
         m = len(self.y_all)
         #random.seed(seed)
         Xshuffled, yshuffled = self.shuffle()
-        """ X_b = np.split(Xshuffled, m)
-        y_b = np.split(yshuffled, m)
-        print(X_b.shape)
-        X_b = np.concatenate(X_b)
-        y_b = np.concatenate(y_b)"""
         
         self.cost = np.array([])
         for i in range(m):
@@ -265,45 +246,29 @@ class Weight:
             self.eta = self.learning_schedule((self.epoch*m+i)*1)
             self.beta -=  self.eta*gradient
             self.cost = np.append(self.cost, self.cost_function())
+        return self.beta
 
-        return self.beta    
+    def stochastic_gradient_descent_Skl(self):
+        m = len(self.y_all)
+        self.cost = np.array([])
+        # self.X, self.y = self.shuffle()
+        clf = SGDClassifier(loss="log", penalty="l2", max_iter=self.iterations, shuffle=True, random_state=seed)
+        clf.fit(self.X_all, self.y_all.ravel(), coef_init=self.beta)
+        self.beta = (clf.coef_).T
+        return self.beta, clf.predict_proba
 
     def cost_function(self):
         return -np.sum(self.y * np.log(sigmoid(self.X, self.beta)) + (1 - self.y) * np.log(1 - sigmoid(self.X, self.beta))) / (len(self.y))
 
     def train(self, method):
         self.cost_all = np.array([])
+        if 'Skl' in str(method):
+            self.iterations = 1
         for i in range(self.iterations):
             self.epoch = i
             self.beta = method()
             self.cost_all = np.append(self.cost_all, self.cost)
-           # print(self.cost_all)
         return self.beta, self.cost_all
-
-
-# def new_weight(X, y, beta, eta):
-#     gradient = -(X.T.dot(y - sigmoid(X, beta)))
-#     beta -= eta * gradient
-#     return beta, gradient
-#
-# def cost_function(X, y, beta):
-#     Computes the cost function for all the training samples
-    # cost_func = -np.sum(y*np.log(sigmoid(X,beta), dtype=np.float128) + (1-y)* np.log(1-sigmoid(X, beta),dtype=np.float128))/(len(y))
-    # return cost_func
-
-# def train(X, y, beta, eta, n_iter):
-#     cost_all = np.array([])
-#
-#     for i in range(n_iter):
-#         betas, gradient = new_weight(X, y, beta, eta)
-        # w = Weight(X,y,beta,eta)
-        # betas, gradient = w.gradient_descent()
-        # norm = np.linalg.norm(gradient)
-        # cost_current = cost_function(X, y, betas)
-        # cost_all = np.append(cost_all,cost_current)
-    #
-    # return betas, cost_all
-
 
 
 def classification(X, betas, y_test=[0]):
@@ -329,65 +294,85 @@ def classification(X, betas, y_test=[0]):
 
 
 
-def Plots(costfunc_plot, LR_plot, ROC_plot, MB_GD_plot, Stoch_GD_plot):
-    w = Weight(X_train_scaled,y_train,beta_init,eta, 1)
-    if (costfunc_plot == 1):
-        _,cost_all = w.train( w.gradient_descent)
-        epoch = np.arange(len(cost_all))
-        plt.plot(epoch, cost_all)
-        plt.show()
-
-    elif (LR_plot == 1):
-        final_betas,_ = w.train(w.gradient_descent)
-        prob_train = classification(X_train_scaled, final_betas)[0]
-        x_sigmoid = np.dot(X_train_scaled, final_betas)
-        plt.scatter(x_sigmoid, prob_train)
-        plt.show()
-
-    elif (ROC_plot==1):
-        final_betas_grad,_ = w.train(w.gradient_descent)
-        prob_grad, y_pred_grad = classification(X_test_scaled, final_betas_grad, y_test)[0:2]
-        false_pos_grad, true_pos_grad = roc_curve(y_test, prob_grad)[0:2]
-        print("Area under curve gradient: ", auc(false_pos_grad, true_pos_grad))
-        
-        final_betas_MB,_ = w.train(w.mini_batch_gradient_descent)
-        prob_MB, y_pred_MB = classification(X_test_scaled,final_betas_MB, y_test)[0:2]
-        false_pos_MB, true_pos_MB = roc_curve(y_test, prob_MB)[0:2]
-        print("Area under curve MB: ", auc(false_pos_MB, true_pos_MB))
-
+def Plots(ROC_plot, GD_plot, MB_GD_plot, Stoch_GD_plot, Newton_plot, Scatter_GD_plot):
+    w = Weight(X_train_scaled,y_train,beta_init,eta, 5)
+    if (ROC_plot==1):
+        # final_betas_grad,_ = w.train(w.gradient_descent)
+        # prob_grad, y_pred_grad = classification(X_test_scaled, final_betas_grad, y_test)[0:2]
+        # false_pos_grad, true_pos_grad = roc_curve(y_test, prob_grad)[0:2]
+        # print("Area under curve gradient: ", auc(false_pos_grad, true_pos_grad))
+        #
+        # final_betas_MB,_ = w.train(w.mini_batch_gradient_descent)
+        # prob_MB, y_pred_MB = classification(X_test_scaled,final_betas_MB, y_test)[0:2]
+        # false_pos_MB, true_pos_MB = roc_curve(y_test, prob_MB)[0:2]
+        # print("Area under curve MB: ", auc(false_pos_MB, true_pos_MB))
+        #
         final_betas_ST,_ = w.train(w.stochastic_gradient_descent)
         prob_ST, y_pred_ST = classification(X_test_scaled,final_betas_ST, y_test)[0:2]
         false_pos_ST, true_pos_ST = roc_curve(y_test, prob_ST)[0:2]
         print("Area under curve ST: ", auc(false_pos_ST, true_pos_ST))
 
+        final_betas_ST_Skl,_ = w.train(w.stochastic_gradient_descent_Skl)
+        prob_ST_Skl, y_pred_ST_Skl = classification(X_test_scaled,final_betas_ST_Skl, y_test)[0:2]
+        false_pos_ST_Skl, true_pos_ST_Skl = roc_curve(y_test, prob_ST_Skl)[0:2]
+        print("Area under curve ST_skl: ", auc(false_pos_ST_Skl, true_pos_ST_Skl))
+
+        # final_betas_Newton,_ = w.train(w.newtons_method)
+        # prob_Newton, y_pred_Newton = classification(X_test_scaled,final_betas_Newton, y_test)[0:2]
+        # false_pos_Newton, true_pos_Newton = roc_curve(y_test, prob_Newton)[0:2]
+        # print("Area under curve Newton: ", auc(false_pos_Newton, true_pos_Newton))
+
         plt.plot([0, 1], [0, 1], "k--")
-        plt.plot(false_pos_grad, true_pos_grad,label="Gradient")
+        # plt.plot(false_pos_grad, true_pos_grad,label="Gradient")
         plt.plot(false_pos_ST, true_pos_ST, label="Stoch")
-        plt.plot(false_pos_MB, true_pos_MB, label="Mini")
+        plt.plot(false_pos_ST_Skl, true_pos_ST_Skl, label="Stoch_Skl")
+        # plt.plot(false_pos_MB, true_pos_MB, label="Mini")
+        # plt.plot(false_pos_Newton, true_pos_Newton, label="Newton")
         plt.legend()
         plt.xlabel("False Positive rate")
         plt.ylabel("True Positive rate")
         plt.title("ROC curve gradient descent")
         plt.show()
 
-    elif (MB_GD_plot == 1):
+    if (GD_plot == 1):
+        _, cost_all = w.train(w.gradient_descent)
+        epoch = np.arange(len(cost_all))
+
+        plt.plot(epoch, cost_all)
+        plt.show()
+
+    if (MB_GD_plot == 1):
         _,cost_all = w.train(w.mini_batch_gradient_descent)
         batch = np.arange(len(cost_all))
         
         plt.plot(batch, cost_all)
         plt.show()
 
-    elif (Stoch_GD_plot == 1):
+    if (Stoch_GD_plot == 1):
         _,cost_all = w.train(w.stochastic_gradient_descent)
         batch = np.arange(len(cost_all))
         
         plt.plot(batch, cost_all)
-        plt.show()    
+        plt.show()
+
+    if (Newton_plot == 1):
+        _,cost_all = w.train(w.newtons_method)
+        epochs = np.arange(len(cost_all))
+
+        plt.plot(epochs, cost_all)
+        plt.show()
+
+    if (Scatter_GD_plot == 1):
+        final_betas,_ = w.train(w.gradient_descent)
+        prob_train = classification(X_train_scaled, final_betas)[0]
+        x_sigmoid = np.dot(X_train_scaled, final_betas)
+        plt.scatter(x_sigmoid, prob_train)
+        plt.show()
 
 
 
-
-Plots(0, 0, 1, 0, 0)
+Plots(1, 0, 0, 0, 0, 0)
+# Plots(0, 0, 1, 0, 0)
 #ConfMatrix = confusion_matrix(y, y_pred)
 
 # plt.scatter(x_sigmoid,prob)
