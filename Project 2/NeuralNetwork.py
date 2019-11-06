@@ -124,6 +124,8 @@ class NeuralNetwork:
     def ELU(self, z):
         return np.where(z<=0, self.alpha*(np.exp(z)-1), z)
 
+    def tanh(self, z):
+        return np.tanh(z)    
 
     
     #Derivatives of activation function
@@ -140,6 +142,9 @@ class NeuralNetwork:
     def ELU_grad(self, a):  
         return np.where(a<=0, self.alpha*np.exp(a), 1) 
 
+    def tanh_grad(self, a):
+        return 1 - self.tanh(a)**2
+            
     #Cost Functions
     def crossentropy(self, a, y):
         return np.nan_to_num(a-y)/(a*(1-a))
@@ -244,6 +249,7 @@ class NeuralNetwork:
                 self.backpropagation()
             if (np.sum(X_test) != 0):
                 self.y_predict_epoch[i] = self.predict_probabilities(X_test).flatten()
+                #print(self.y_predict_epoch.shape)
                 #np.insert(self.y_predict_epoch,i, self.predict_probabilities(X_test).flatten())
 
     

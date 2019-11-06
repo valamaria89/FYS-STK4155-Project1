@@ -2,7 +2,7 @@ import numpy as np
 import sklearn.linear_model as skl
 import sys
 #import sklearn.linear_model as Ridge
-#from mpl_toolkits.mplot3d import Axes3D
+from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib.ticker import LinearLocator, FormatStrFormatter
@@ -53,7 +53,8 @@ z = FrankeFunction(x, y)
 #print(z.shape)
 z = np.ravel(z)
 #np.random.seed(seed)
-noise = np.random.randn(z.shape[0])
+noise = np.random.randn(z.shape[0])#*0.001
+#z += noise
 shape = (400,1)
 z.shape = shape
 
@@ -83,7 +84,7 @@ def CreateDesignMatrix_X(x, y, n ):
 X = CreateDesignMatrix_X(x,y,4)
 
 
-X_train, X_test, z_train, z_test = train_test_split(X, z, test_size=0.4, random_state=seed)
+X_train, X_test, z_train, z_test = train_test_split(X, z, test_size=0.2, random_state=seed)
 X_test, X_val, z_test, z_val = train_test_split(X_test, z_test, test_size= 0.5, random_state=seed)
 
 
@@ -100,7 +101,7 @@ def MSE(z, z_tilde):
 
 
 
-epochs = 200
+epochs = 500
 batch_size = 10
 eta = 0.001
 n_hidden_neurons = 100 #[1, 10, 20, 25, 40, 50]
@@ -111,14 +112,18 @@ dnn = NN(X_train, z_train, eta=eta, lmbd=lmbd, epochs=epochs, batch_size=batch_s
                     n_hidden_neurons=n_hidden_neurons, n_categories=n_categories,
                     cost_grad = 'MSE', activation = 'sigmoid', activation_out='sigmoid') #n_categories=n_categories
 
+dnn1 = NN(X_train, z_train, eta=eta, lmbd=lmbd, epochs=epochs, batch_size=batch_size,
+                    n_hidden_neurons=n_hidden_neurons, n_categories=n_categories,
+                    cost_grad = 'MSE', activation = 'sigmoid', activation_out='tanh')
 epoc_vals = np.arange(epochs)
 dnn.train(X_train)
 MSE_train = dnn.MSE_epoch(z_train)
 
-dnn.train(X_train)
-MSE_val = dnn.MSE_epoch(z_train)
-plt.plot(epoc_vals, MSE_train)
-plt.plot(epoc_vals, MSE_val)
+dnn1.train(X_val)
+MSE_val = dnn1.MSE_epoch(z_val)
+plt.plot(epoc_vals, MSE_train, label="Train")
+plt.plot(epoc_vals, MSE_val, label="Val")
+plt.legend()
 plt.show()
 
 #z_pred_train = dnn.predict_probabilities(X_train)
