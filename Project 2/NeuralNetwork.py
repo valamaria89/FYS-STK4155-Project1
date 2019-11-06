@@ -14,15 +14,15 @@ from sklearn.metrics import confusion_matrix, accuracy_score, roc_auc_score, roc
 from sklearn.linear_model import LogisticRegression
 import matplotlib.pyplot as plt
 from functools import partial
-
+from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 # Trying to set the seed
 
 import random
 
-seed = 42
+seed = 3000
 random.seed(seed)
 
-pd.set_option('display.max_rows', None)
+"""pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', None)
 pd.set_option('display.max_colwidth', -1)
@@ -67,7 +67,7 @@ def to_categorical_numpy(integer_vector):
 # Y_train_onehot, Y_test_onehot = to_categorical(Y_train), to_categorical(Y_test)
 # y_train_onehot, y_test_onehot = to_categorical_numpy(y_train), to_categorical_numpy(y_test)
 
-
+"""
 class NeuralNetwork:
     def __init__(
             self,
@@ -80,8 +80,10 @@ class NeuralNetwork:
             eta=0.1,
             lmbd=0.0,
             cost_grad = 'crossentropy',
-            activation = 'sigmoid'):
+            activation = 'sigmoid',
+            activation_out = 'sigmoid' ):
 
+        self.alpha = 0.01
         self.X_data_full = X_data
         self.Y_data_full = Y_data
         self.X_data = X_data
@@ -101,18 +103,51 @@ class NeuralNetwork:
         self.cost_grad = getattr(self,cost_grad)
         self.activation = getattr(self,activation)
         self.activation_grad = getattr(self,activation + '_grad')
+        self.activation_out = getattr(self,activation_out)
+        self.activation_out_grad = getattr(self,activation_out + '_grad')
+
+        self.y_predict_epoch = None
 
         self.create_biases_and_weights()
+    #Activation functions: 
 
     def sigmoid(self, z):
         siggy = 1 / (1 + np.exp(-z))
         return siggy
 
-    def crossentropy(self, a, y):
-        return np.nan_to_num(a-y)/(a*(1-a))
+    def ReLu(self, z):
+        return np.maximum(z,0) 
+
+    def Leaky_ReLu(self,z):
+        return np.where(z<=0, self.alpha*z, z)
+
+    def ELU(self, z):
+        return np.where(z<=0, self.alpha*(np.exp(z)-1), z)
+
+
+    
+    #Derivatives of activation function
 
     def sigmoid_grad(self, a):
         return np.nan_to_num(a*(1-a))
+    
+    def ReLu_grad(self, a):
+        return (a > 0) * 1
+
+    def Leaky_ReLu_grad(self, a):
+        return  np.where(a<=0, self.alpha, 1)
+
+    def ELU_grad(self, a):  
+        return np.where(a<=0, self.alpha*np.exp(a), 1) 
+
+    #Cost Functions
+    def crossentropy(self, a, y):
+        return np.nan_to_num(a-y)/(a*(1-a))
+
+    def MSE(self, a, y):
+        return (a-y)    
+
+    
 
     def create_biases_and_weights(self):
         self.hidden_weights = np.random.randn(self.n_features, self.n_hidden_neurons)*1e-3
@@ -128,10 +163,11 @@ class NeuralNetwork:
         self.a_h = self.activation(self.z_h)
 
         self.z_o = np.matmul(self.a_h, self.output_weights) + self.output_bias
-        self.a_o = self.activation(self.z_o)
 
-        exp_term = np.exp(self.z_o)
-        self.probabilities = exp_term / np.sum(exp_term, axis=1, keepdims=True)
+        self.a_o = self.activation_out(self.z_o)
+
+        #exp_term = np.exp(self.z_o)
+        #self.probabilities = exp_term / np.sum(exp_term, axis=1, keepdims=True)
 
     def feed_forward_out(self, X):
         # feed-forward for output
@@ -139,14 +175,14 @@ class NeuralNetwork:
         a_h = self.activation(z_h)
 
         z_o = np.matmul(a_h, self.output_weights) + self.output_bias
-        a_o = self.activation(z_o)
+        a_o = self.activation_out(z_o)
 
-        exp_term = np.exp(z_o)
-        probabilities = exp_term / np.sum(exp_term, axis=1, keepdims=True)
+        #exp_term = np.exp(z_o)
+        #probabilities = exp_term / np.sum(exp_term, axis=1, keepdims=True)
         return a_o
 
     def backpropagation(self):
-        error_output = self.activation_grad(self.activation(self.z_o))*self.cost_grad(self.a_o,self.Y_data)
+        error_output = self.activation_out_grad(self.activation_out(self.z_o))*self.cost_grad(self.a_o,self.Y_data)
         error_hidden = np.matmul(error_output, self.output_weights.T) * self.activation_grad(self.a_h)
 
         self.output_weights_gradient = np.matmul(self.a_h.T, error_output)
@@ -159,11 +195,11 @@ class NeuralNetwork:
         if self.lmbd > 0.0:
             self.output_weights_gradient += self.lmbd * self.output_weights
             self.hidden_weights_gradient += self.lmbd * self.hidden_weights
-
-        self.output_weights -= self.eta * self.output_weights_gradient
-        self.output_bias -= self.eta * self.output_bias_gradient
-        self.hidden_weights -= self.eta * self.hidden_weights_gradient
-        self.hidden_bias -= self.eta * self.hidden_bias_gradient
+        eta = self.eta/self.batch_size    
+        self.output_weights -= eta * self.output_weights_gradient
+        self.output_bias -= eta * self.output_bias_gradient
+        self.hidden_weights -= eta * self.hidden_weights_gradient
+        self.hidden_bias -= eta * self.hidden_bias_gradient
 
     def predict(self, X):
         probabilities = self.feed_forward_out(X)
@@ -173,8 +209,23 @@ class NeuralNetwork:
         probabilities = self.feed_forward_out(X)
         return probabilities
 
-    def train(self):
+    def MSE_epoch(self, y_test):
+        MSE = np.zeros((self.epochs))
+        n = np.size(y_test)
+        y_test = y_test.flatten()
+        for i in range(self.epochs):
+            
+            MSE[i] = mean_squared_error(y_test, self.y_predict_epoch[i])
+           # np.sum((y_test-self.y_predict_epoch[i])**2)/n
+        return MSE
 
+
+    def train(self, X_test=0):
+        #np.random.seed(seed)
+        if (np.sum(X_test) != 0):
+            #print("here")
+            self.y_predict_epoch = np.zeros((self.epochs,X_test.shape[0]))
+            #print(self.y_predict_epoch)
         data_indices = np.arange(self.n_inputs)
         for i in range(self.epochs):
             for j in range(self.iterations):
@@ -186,24 +237,30 @@ class NeuralNetwork:
                 # minibatch training data
                 self.X_data = self.X_data_full[chosen_datapoints]
                 self.Y_data = self.Y_data_full[chosen_datapoints]
-                print("I :",i)
-                print("J :",j)
+                #print("I :",i)
+                #print("J :",j)
 
                 self.feed_forward()
                 self.backpropagation()
+            if (np.sum(X_test) != 0):
+                self.y_predict_epoch[i] = self.predict_probabilities(X_test).flatten()
+                #np.insert(self.y_predict_epoch,i, self.predict_probabilities(X_test).flatten())
+
+    
 
 
 
-epochs = 10
+
+"""epochs = 20
 batch_size = 10
-eta = 0.01
+eta = 15
 lmbd = 0.01
-n_hidden_neurons = 10
+n_hidden_neurons = 30
 n_categories = 2
 
 dnn = NeuralNetwork(X_train_scaled, y_train, eta=eta, lmbd=lmbd, epochs=epochs, batch_size=batch_size,
                     n_hidden_neurons=n_hidden_neurons, n_categories=n_categories,
-                    cost_grad = 'crossentropy', activation = 'sigmoid')
+                    cost_grad = 'crossentropy', activation = 'sigmoid', activation_out='ELU')
 dnn.train()
 test_predict = dnn.predict(X_test_scaled)
 test_predict1 = dnn.predict_probabilities(X_test_scaled)[:,1:2]
@@ -223,4 +280,4 @@ plt.plot(false_pos, true_pos)
 plt.xlabel("False Positive rate")
 plt.ylabel("True Positive rate")
 plt.title("ROC curve gradient descent")
-plt.show()
+plt.show()"""
