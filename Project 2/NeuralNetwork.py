@@ -15,13 +15,11 @@ from sklearn.linear_model import LogisticRegression
 import matplotlib.pyplot as plt
 from functools import partial
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
-# Trying to set the seed
-
 import random
+import math
 
 seed = 3000
 random.seed(seed)
-
 """pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', None)
@@ -91,11 +89,12 @@ class NeuralNetwork:
 
         self.n_inputs = X_data.shape[0]
         self.n_features = X_data.shape[1]
-        self.n_hidden_neurons = n_hidden_neurons
-        self.n_categories = n_categories
 
+        self.n_hidden_neurons = int(n_hidden_neurons)
+        self.n_categories = n_categories
         self.epochs = epochs
-        self.batch_size = batch_size
+        self.batch_size = int(batch_size)
+
         self.iterations = self.n_inputs // self.batch_size
         self.eta = eta
         self.lmbd = lmbd
@@ -113,19 +112,19 @@ class NeuralNetwork:
 
     def sigmoid(self, z):
         siggy = 1 / (1 + np.exp(-z))
-        return siggy
+        return np.nan_to_num(siggy)
 
     def ReLu(self, z):
-        return np.maximum(z,0) 
+        return np.nan_to_num(np.maximum(z,0))
 
     def Leaky_ReLu(self,z):
-        return np.where(z<=0, self.alpha*z, z)
+        return np.nan_to_num(np.where(z<=0, self.alpha*z, z))
 
     def ELU(self, z):
-        return np.where(z<=0, self.alpha*(np.exp(z)-1), z)
+        return np.nan_to_num(np.where(z<=0, self.alpha*(np.exp(z)-1), z))
 
     def tanh(self, z):
-        return np.tanh(z)    
+        return np.nan_to_num(np.tanh(z))
 
     
     #Derivatives of activation function
@@ -134,16 +133,16 @@ class NeuralNetwork:
         return np.nan_to_num(a*(1-a))
     
     def ReLu_grad(self, a):
-        return (a > 0) * 1
+        return np.nan_to_num((a > 0) * 1)
 
     def Leaky_ReLu_grad(self, a):
-        return  np.where(a<=0, self.alpha, 1)
+        return  np.nan_to_num(np.where(a<=0, self.alpha, 1))
 
     def ELU_grad(self, a):  
-        return np.where(a<=0, self.alpha*np.exp(a), 1) 
+        return np.nan_to_num(np.where(a<=0, self.alpha*np.exp(a), 1))
 
     def tanh_grad(self, a):
-        return 1 - self.tanh(a)**2
+        return np.nan_to_num(1 - self.tanh(a)**2)
             
     #Cost Functions
     def crossentropy(self, a, y):
@@ -155,10 +154,10 @@ class NeuralNetwork:
     
 
     def create_biases_and_weights(self):
-        self.hidden_weights = np.random.randn(self.n_features, self.n_hidden_neurons)*1e-3
+        self.hidden_weights = np.random.randn(self.n_features, self.n_hidden_neurons)#*1e-3
         self.hidden_bias = np.zeros(self.n_hidden_neurons) + 0.01
 
-        self.output_weights = np.random.randn(self.n_hidden_neurons, self.n_categories)*1e-3
+        self.output_weights = np.random.randn(self.n_hidden_neurons, self.n_categories)#*1e-3
         self.output_bias = np.zeros(self.n_categories) + 0.01
 
     def feed_forward(self):
@@ -216,10 +215,10 @@ class NeuralNetwork:
 
     def MSE_epoch(self, y_test):
         MSE = np.zeros((self.epochs))
-        n = np.size(y_test)
         y_test = y_test.flatten()
+        # print(y_test)
         for i in range(self.epochs):
-            
+           # print(self.y_predict_epoch[i])
             MSE[i] = mean_squared_error(y_test, self.y_predict_epoch[i])
            # np.sum((y_test-self.y_predict_epoch[i])**2)/n
         return MSE
@@ -246,6 +245,9 @@ class NeuralNetwork:
                 #print("J :",j)
 
                 self.feed_forward()
+                if (np.isnan(self.z_o).any()):
+                    print("Don't worry! Skipping values where there's NaN")
+                    return
                 self.backpropagation()
             if (np.sum(X_test) != 0):
                 self.y_predict_epoch[i] = self.predict_probabilities(X_test).flatten()

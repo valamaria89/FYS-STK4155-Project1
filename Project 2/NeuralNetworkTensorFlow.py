@@ -207,7 +207,7 @@ The with block terminates the session as soon as the operations are completed.
 Hence, there is no need for calling Session.close. Also, a session contains variables, global variables, placeholders, and ops.
 Hence we call tf.global_variables_initializer().run()
 A graph contains tensors and operations. To initiate a graph, a session is created which runs the graph. In other words, graph provides a schema whereas a session processes a graph to compute values( tensors )."""
-
+"""
 epochs = 2
 batch_size = 100
 #eta = 0.01
@@ -234,13 +234,12 @@ for i, eta in enumerate(eta_vals):
         print("Learning rate = ", eta)
         print("Lambda = ", lmbd)
         print("Test accuracy: %.3f" % DNN.test_accuracy)
-        print()
 
 # optional
 # visual representation of grid search
 # uses seaborn heatmap, could probably do this in matplotlib
-
-
+"""
+"""
 sns.set()
 
 train_accuracy = np.zeros((len(eta_vals), len(lmbd_vals)))
@@ -266,3 +265,5 @@ ax.set_title("Test Accuracy")
 ax.set_ylabel("$\eta$")
 ax.set_xlabel("$\lambda$")
 plt.show()
+
+"""
