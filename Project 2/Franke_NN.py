@@ -34,6 +34,7 @@ from matplotlib.ticker import LinearLocator, FormatStrFormatter
 from inspect import signature
 import time
 import math as m
+from sklearn.neural_network import MLPRegressor
 
 
 from NeuralNetwork import NeuralNetwork as NN
@@ -178,7 +179,7 @@ def hypertuning(iterations, cols, etamax, etamin, lmbdmax, lmbdmin, batch_sizema
     return hyper[:,MSE_best_index]
 #iterations, cols, etamax, etamin, lmbdmax, lmbdmin, batch_sizemax, batch_sizemin, hiddenmax,hiddenmin
 #iterations must be larger than cols. Cols is how many of each of the parameters there will be in the given intervals.
-print("parameters: ",hypertuning(1000, 1000, 1, -6, 1, -12, 100, 1, 500, 1))
+#print("parameters: ",hypertuning(1000, 1000, 1, -6, 1, -12, 100, 1, 500, 1))
 
 # eta, lmb, batchsize, hidden_neurons, epochs
 #[4.33148322e-03 3.75469422e-11 1.00000000e+00 4.22000000e+02 1.97000000e+02]
@@ -192,7 +193,7 @@ print("parameters: ",hypertuning(1000, 1000, 1, -6, 1, -12, 100, 1, 500, 1))
 def Franke_plot(X,X_train,X_test):
     eta = 4.33148322e-03
     lmbd = 3.75469422e-11
-    batch_size = 1
+    batch_size = 2
     n_hidden_neurons = 422
     epochs = 197
 
@@ -204,6 +205,8 @@ def Franke_plot(X,X_train,X_test):
     dnn.train(X)
     z_pred = dnn.y_predict_epoch[epochs]
 
+    print(mean_squared_error(z, z_pred))
+    print(r2_score(z, z_pred))
     xsize = x.shape[0]
     ysize = y.shape[0]
 
@@ -235,8 +238,60 @@ def Franke_plot(X,X_train,X_test):
     #z_pred_train = dnn.predict_probabilities(X_train)
     #z_pred_val = dnn.predict_probabilities(X_val)
 
-# Franke_plot(X,X_train,X_test)
+#Franke_plot(X,X_train,X_test)
 
+def Franke_plot_scikit(X, z, X_train, z_train):
+    eta = 4.33148322e-03
+    lmbd = 3.75469422e-11
+    batch_size = 2
+    n_neurons_layer1 = 221
+    n_neurons_layer2 = 221
+    epochs = 197
+    #z = np.ravel(z)
+    #z_train = z_train.ravel()
+    
+    #print(z_train)
+    
+    n_categories = 1
+
+    dnn = MLPRegressor(hidden_layer_sizes=(422),activation='relu', solver='sgd', alpha=lmbd, batch_size=batch_size, 
+        learning_rate_init=eta, 
+        max_iter=epochs,random_state=seed)
+    
+    dnn.fit(X_train, z_train)
+    z_pred = dnn.predict(X)
+
+    print(mean_squared_error(z, z_pred))
+    print(r2_score(z, z_pred))
+    xsize = x.shape[0]
+    ysize = y.shape[0]
+
+    rows = np.arange(ysize)
+    cols = np.arange(xsize)
+
+    [X, Y] = np.meshgrid(cols, rows)
+
+
+    z_mesh = np.reshape(z, (ysize, xsize))
+    z_predict_mesh = np.reshape(z_pred, (ysize, xsize))
+
+    fig, axs = plt.subplots(1, 2, subplot_kw={'projection': '3d'})
+    # plt.figure()
+
+    ax = fig.axes[0]
+    ax.plot_surface(X, Y, z_predict_mesh, cmap=cm.viridis, linewidth=0)
+    ax.set_title('Fitted terrain cut')
+
+    ax = fig.axes[1]
+    ax.plot_surface(X, Y, z_mesh, cmap=cm.viridis, linewidth=0)
+    ax.set_title('Terrain cut')
+
+    plt.xlabel('X')
+    plt.ylabel('Y')
+
+    plt.show()
+
+Franke_plot_scikit(X, z, X_train, z_train)
 #MSE_train = MSE(z_train, z_pred_train)
 """eta_vals = np.arange(1,4, 0.2)#np.logspace(-1, 1, 20)#[1e-8, 1e-6,1e-4,1e-2,1e-2,1e-1]
 #print(eta_vals)
