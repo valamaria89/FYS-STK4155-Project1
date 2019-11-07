@@ -87,16 +87,17 @@ def Correlation(df):
     # plt.matshow(corr)
     # plt.show()
     # corr.show()
-    fig, ax = plt.subplots(figsize=(10, 10))
+    fig, ax = plt.subplots(figsize=(20, 15))
     corr = df.corr()
     # corr.style.background_gradient(cmap='coolwarm', axis=None).set_precision(2)
-    ax = sns.heatmap(corr, annot=True, vmin=-1, vmax=1, center=0,cmap=sns.diverging_palette(20, 220, n=200),square=True, fmt='f')
+    ax = sns.heatmap(corr, annot=True, vmin=-1, vmax=1, center=0,cmap=sns.diverging_palette(20, 220, n=200),square=True, fmt='.2f', annot_kws={"size": 7})
     ax.set_xticklabels(
         ax.get_xticklabels(),
         rotation=45,
         horizontalalignment='right'
 
     );
+    ax.set_ylim(df.shape[1], 0)
     ax.set_title("Training Accuracy")
     ax.set_ylabel("$\eta$")
     ax.set_xlabel("$\lambda$")

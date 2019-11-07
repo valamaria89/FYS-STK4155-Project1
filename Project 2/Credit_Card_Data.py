@@ -16,6 +16,7 @@ from sklearn.linear_model import SGDClassifier
 import matplotlib.pyplot as plt
 from functools import partial
 
+
 # Trying to set the seed
 
 import random
@@ -89,7 +90,6 @@ print("Non-Default: ", no_perc)
 
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=seed)
-
 
 scaler = StandardScaler()
 scaler.fit(X_train)
@@ -285,6 +285,22 @@ def classification(X, betas, y_test=[0]):
 
     return prob, y_pred, tot/len(y_pred)
 
+def logistic_regression_SKL(X_train, X_test, y_train, y_test):
+    clf = LogisticRegression(random_state=seed, solver='lbfgs',multi_class = 'ovr').fit(X_train, y_train.ravel())
+    prob_LogReg_Skl = clf.predict_proba(X_test)[:,1:2]
+    print(prob_LogReg_Skl)
+    false_pos_LogReg_Skl, true_pos_LogReg_Skl = roc_curve(y_test, prob_LogReg_Skl)[0:2]
+    print("Area under curve LogReg_skl: ", auc(false_pos_LogReg_Skl, true_pos_LogReg_Skl))
+
+    plt.plot([0, 1], [0, 1], "k--")
+    plt.plot(false_pos_LogReg_Skl, true_pos_LogReg_Skl, label="LogReg")
+    plt.legend()
+    plt.xlabel("False Positive rate")
+    plt.ylabel("True Positive rate")
+    plt.title("ROC curve")
+    plt.show()
+    return prob
+
 
 #final_betas, cost_all = train(X_train_scaled, y_train, beta_init, eta, n_iter, 1e-04)
 # print(classification(X_train_scaled,final_betas))
@@ -302,20 +318,20 @@ def Plots(ROC_plot, GD_plot, MB_GD_plot, Stoch_GD_plot, Newton_plot, Scatter_GD_
         # false_pos_grad, true_pos_grad = roc_curve(y_test, prob_grad)[0:2]
         # print("Area under curve gradient: ", auc(false_pos_grad, true_pos_grad))
         #
-        # final_betas_MB,_ = w.train(w.mini_batch_gradient_descent)
-        # prob_MB, y_pred_MB = classification(X_test_scaled,final_betas_MB, y_test)[0:2]
-        # false_pos_MB, true_pos_MB = roc_curve(y_test, prob_MB)[0:2]
-        # print("Area under curve MB: ", auc(false_pos_MB, true_pos_MB))
-        #
+        final_betas_MB,_ = w.train(w.mini_batch_gradient_descent)
+        prob_MB, y_pred_MB = classification(X_test_scaled,final_betas_MB, y_test)[0:2]
+        false_pos_MB, true_pos_MB = roc_curve(y_test, prob_MB)[0:2]
+        print("Area under curve MB: ", auc(false_pos_MB, true_pos_MB))
+
         final_betas_ST,_ = w.train(w.stochastic_gradient_descent)
         prob_ST, y_pred_ST = classification(X_test_scaled,final_betas_ST, y_test)[0:2]
         false_pos_ST, true_pos_ST = roc_curve(y_test, prob_ST)[0:2]
         print("Area under curve ST: ", auc(false_pos_ST, true_pos_ST))
 
-        final_betas_ST_Skl,_ = w.train(w.stochastic_gradient_descent_Skl)
-        prob_ST_Skl, y_pred_ST_Skl = classification(X_test_scaled,final_betas_ST_Skl, y_test)[0:2]
-        false_pos_ST_Skl, true_pos_ST_Skl = roc_curve(y_test, prob_ST_Skl)[0:2]
-        print("Area under curve ST_skl: ", auc(false_pos_ST_Skl, true_pos_ST_Skl))
+        # final_betas_ST_Skl,_ = w.train(w.stochastic_gradient_descent_Skl)
+        # prob_ST_Skl, y_pred_ST_Skl = classification(X_test_scaled,final_betas_ST_Skl, y_test)[0:2]
+        # false_pos_ST_Skl, true_pos_ST_Skl = roc_curve(y_test, prob_ST_Skl)[0:2]
+        # print("Area under curve ST_skl: ", auc(false_pos_ST_Skl, true_pos_ST_Skl))
 
         # final_betas_Newton,_ = w.train(w.newtons_method)
         # prob_Newton, y_pred_Newton = classification(X_test_scaled,final_betas_Newton, y_test)[0:2]
@@ -325,14 +341,14 @@ def Plots(ROC_plot, GD_plot, MB_GD_plot, Stoch_GD_plot, Newton_plot, Scatter_GD_
         plt.plot([0, 1], [0, 1], "k--")
         # plt.plot(false_pos_grad, true_pos_grad,label="Gradient")
         plt.plot(false_pos_ST, true_pos_ST, label="Stoch")
-        plt.plot(false_pos_ST_Skl, true_pos_ST_Skl, label="Stoch_Skl")
-        # plt.plot(false_pos_MB, true_pos_MB, label="Mini")
+        # plt.plot(false_pos_ST_Skl, true_pos_ST_Skl, label="Stoch_Skl")
+        plt.plot(false_pos_MB, true_pos_MB, label="Mini")
         # plt.plot(false_pos_Newton, true_pos_Newton, label="Newton")
         plt.legend()
         plt.xlabel("False Positive rate")
         plt.ylabel("True Positive rate")
-        plt.title("ROC curve gradient descent")
-        plt.show()
+        plt.title("ROC curve")
+        # plt.show()
 
     if (GD_plot == 1):
         _, cost_all = w.train(w.gradient_descent)
@@ -370,8 +386,9 @@ def Plots(ROC_plot, GD_plot, MB_GD_plot, Stoch_GD_plot, Newton_plot, Scatter_GD_
         plt.show()
 
 
-
 Plots(1, 0, 0, 0, 0, 0)
+logistic_regression_SKL(X_train_scaled, X_test_scaled, y_train, y_test)
+
 # Plots(0, 0, 1, 0, 0)
 #ConfMatrix = confusion_matrix(y, y_pred)
 
