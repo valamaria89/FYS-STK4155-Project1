@@ -41,7 +41,7 @@ from NeuralNetwork import NeuralNetwork as NN
 
 np.set_printoptions(threshold=sys.maxsize)
 
-seed = 3000
+seed = 43
 np.random.seed(seed)
 
 x = np.arange(0, 1, 0.05)
@@ -96,7 +96,7 @@ X = CreateDesignMatrix_X(x,y,4)
 
 
 X_train, X_test, z_train, z_test = train_test_split(X, z, test_size=0.2, random_state=seed)
-X_test, X_val, z_test, z_val = train_test_split(X_test, z_test, test_size= 0.5, random_state=seed)
+X_test, X_val, z_test, z_val = train_test_split(X_test, z_test, test_size= 0.51, random_state=seed)
 
 
 
@@ -108,78 +108,10 @@ def MSE(z, z_tilde):
     n = np.size(z_tilde)
     return np.sum((z-z_tilde)**2)/n
 
-epochs = 200
-#batch_size = 10
-#eta = 0.001
-#n_hidden_neurons = 100 #[1, 10, 20, 25, 40, 50]
-#lmbd = 0.0
-n_categories = 1 #z_train.shape[0]
 
-def hypertuning(iterations, cols, etamax, etamin, lmbdmax, lmbdmin, batch_sizemax, batch_sizemin, hiddenmax,hiddenmin):
-    start_time = time.time()
-    if (cols < iterations):
-        cols = iterations
-        print("cols must be larger than 'iterations. Cols is set equal to iterations")
-    sig = signature(hypertuning)
-    rows = int(len(sig.parameters)/2)
-    hyper = np.zeros((rows, cols))
-    MSE_array = np.zeros(iterations)
-    hyper[0] =  np.logspace(etamin, etamax, cols)
-    hyper[1] = np.logspace(lmbdmin, lmbdmax, cols)
-    hyper[2] = np.round(np.linspace(batch_sizemin, batch_sizemax, cols, dtype='int'))
-    hyper[3] = np.round(np.linspace(hiddenmin, hiddenmax, cols))
-    hyper[4] = np.zeros((cols))
-    #print(hyper)
-    for i in range(rows-1):
-        np.random.shuffle(hyper[i])
-        #print(np.apply_along_axis(np.random.shuffle, 1, hyper[i]))
-
-    for it in range(iterations):
-        hyper_choice = hyper[:,it]
-        eta = hyper_choice[0]
-        lmbd = hyper_choice[1]
-        batch_size = hyper_choice[2]
-        n_hidden_neurons = hyper_choice[3]
-
-
-        dnn = NN(X_train, z_train, eta=eta, lmbd=lmbd, epochs=epochs, batch_size=batch_size,
-                 n_hidden_neurons=n_hidden_neurons, n_categories=n_categories,
-                 cost_grad='MSE', activation='sigmoid', activation_out='ELU')
-
-        dnn.train(X_val)
-        MSE_val = dnn.MSE_epoch(z_val)
-
-        best_pred_epoch = np.argmin(MSE_val)
-
-        dnn_test = NN(X_train, z_train, eta=eta, lmbd=lmbd, epochs=best_pred_epoch+1, batch_size=batch_size,
-                  n_hidden_neurons=n_hidden_neurons, n_categories=n_categories,
-                  cost_grad='MSE', activation='sigmoid', activation_out='ELU')
-        dnn_test.train(X_test)
-
-        # kan jo bare bruke predict probabilities på siste her
-
-        z_pred = dnn_test.y_predict_epoch[best_pred_epoch]
-
-        MSE_array[it] = mean_squared_error(z_test,z_pred)
-        hyper[4][it] = best_pred_epoch
-        print(it)
-        if (it%m.ceil((iterations/40))==0):
-            t = round((time.time() - start_time))
-            if t >= 60:
-                sec = t % 60
-                print("--- %s min," % int(t/60),"%s sec ---" % sec)
-            else:
-                print("--- %s sec ---" %int(t))
-    MSE_best_index = np.argmin(MSE_array)
-    MSE_best = np.min(MSE_array)
-    print("MSE array: ", MSE_array)
-    print("best index: ",MSE_best_index)
-    print("best MSE: ", MSE_best)
-
-    return hyper[:,MSE_best_index]
 #iterations, cols, etamax, etamin, lmbdmax, lmbdmin, batch_sizemax, batch_sizemin, hiddenmax,hiddenmin
 #iterations must be larger than cols. Cols is how many of each of the parameters there will be in the given intervals.
-#print("parameters: ",hypertuning(1000, 1000, 1, -6, 1, -12, 100, 1, 500, 1))
+# print("parameters: ",hypertuning(1000, 1000, 1, -6, 1, -12, 100, 1, 500, 1))
 
 # eta, lmb, batchsize, hidden_neurons, epochs
 #[4.33148322e-03 3.75469422e-11 1.00000000e+00 4.22000000e+02 1.97000000e+02]
@@ -190,20 +122,24 @@ def hypertuning(iterations, cols, etamax, etamin, lmbdmax, lmbdmin, batch_sizema
 # n_hidden_neurons = 11
 # lmbd = 4.03701726e-04
 
-def Franke_plot(X,X_train,X_test):
-    eta = 4.33148322e-03
-    lmbd = 3.75469422e-11
-    batch_size = 2
-    n_hidden_neurons = 422
-    epochs = 197
+#1.68743568e-01 8.39312950e-12 9.10000000e+01 3.90000000e+02
+# 2.04000000e+02
+
+def Franke_plot(X,X_train,X_test, eta=0, lmbd=0,batch_size =0, n_hidden_neurons = 0, epochs = 0):
+
+    # eta = 4.33148322e-03
+    # lmbd = 3.75469422e-11
+    # batch_size = 2
+    # n_hidden_neurons = 422
+    # epochs = 197
 
     n_categories = 1
 
-    dnn = NN(X_train, z_train, eta=eta, lmbd=lmbd, epochs=epochs+1, batch_size=batch_size,
+    dnn = NN(X_train, z_train, eta=eta, lmbd=lmbd, epochs=int(epochs), batch_size=batch_size,
                         n_hidden_neurons=n_hidden_neurons, n_categories=n_categories,
                         cost_grad = 'MSE', activation = 'sigmoid', activation_out='ELU')
-    dnn.train(X)
-    z_pred = dnn.y_predict_epoch[epochs]
+    dnn.train_and_validate()
+    z_pred = dnn.predict_probabilities(X)
 
     print(mean_squared_error(z, z_pred))
     print(r2_score(z, z_pred))
@@ -238,7 +174,7 @@ def Franke_plot(X,X_train,X_test):
     #z_pred_train = dnn.predict_probabilities(X_train)
     #z_pred_val = dnn.predict_probabilities(X_val)
 
-#Franke_plot(X,X_train,X_test)
+# Franke_plot(X,X_train,X_test)
 
 def Franke_plot_scikit(X, z, X_train, z_train):
     eta = 4.33148322e-03
@@ -247,10 +183,6 @@ def Franke_plot_scikit(X, z, X_train, z_train):
     n_neurons_layer1 = 221
     n_neurons_layer2 = 221
     epochs = 197
-    #z = np.ravel(z)
-    #z_train = z_train.ravel()
-    
-    #print(z_train)
     
     n_categories = 1
 
@@ -291,7 +223,83 @@ def Franke_plot_scikit(X, z, X_train, z_train):
 
     plt.show()
 
-Franke_plot_scikit(X, z, X_train, z_train)
+epochs = 1000
+#batch_size = 10
+#eta = 0.001
+#n_hidden_neurons = 100 #[1, 10, 20, 25, 40, 50]
+#lmbd = 0.0
+n_categories = 1 #z_train.shape[0]
+
+def hypertuning(iterations, cols, etamax, etamin, lmbdmax, lmbdmin, batch_sizemax, batch_sizemin, hiddenmax,hiddenmin):
+
+    start_time = time.time()
+    if (cols < iterations):
+        cols = iterations
+        print("cols must be larger than 'iterations. Cols is set equal to iterations")
+    sig = signature(hypertuning)
+    rows = int(len(sig.parameters)/2)
+    hyper = np.zeros((rows, cols))
+    MSE_array = np.zeros(iterations)
+    hyper[0] =  np.logspace(etamin, etamax, cols)
+    hyper[1] = np.logspace(lmbdmin, lmbdmax, cols)
+    hyper[2] = np.round(np.linspace(batch_sizemin, batch_sizemax, cols, dtype='int'))
+    hyper[3] = np.round(np.linspace(hiddenmin, hiddenmax, cols))
+    hyper[4] = np.zeros((cols))
+    #print(hyper)
+    for i in range(rows-1):
+        np.random.shuffle(hyper[i])
+
+    n_categories = 1
+    # dnn = NN(X_train, z_train, n_categories=n_categories,
+    #          cost_grad='MSE', activation='sigmoid', activation_out='ELU')
+
+    for it in range(iterations):
+        hyper_choice = hyper[:,it]
+        eta = hyper_choice[0]
+        lmbd = hyper_choice[1]
+        batch_size = hyper_choice[2]
+        n_hidden_neurons = hyper_choice[3]
+        epochs = 1000
+
+        # dnn.set_parameters(eta=eta, lmbd=lmbd, epochs=epochs, batch_size=batch_size,
+        #                 n_hidden_neurons=n_hidden_neurons)
+        dnn = NN(X_train, z_train, eta=eta, lmbd=lmbd, epochs=epochs, batch_size=batch_size, n_hidden_neurons=n_hidden_neurons, n_categories=n_categories,
+                 cost_grad='MSE', activation='sigmoid', activation_out='ELU')
+        dnn.train_and_validate(X_val,z_val, MSE_store = False)
+        # MSE = dnn.MSE_epoch()
+        # epo = np.arange(len(MSE))
+        # plt.plot(epo, MSE)
+        # plt.show()
+        z_pred = dnn.predict_probabilities(X_test)
+
+        MSE_array[it] = mean_squared_error(z_test,z_pred)
+        hyper[4][it] = dnn.epoch +1
+        if (it%m.ceil((iterations/40))==0):
+            print('Iteration: ', it)
+            t = round((time.time() - start_time))
+            if t >= 60:
+                sec = t % 60
+                print("--- %s min," % int(t/60),"%s sec ---" % sec)
+            else:
+                print("--- %s sec ---" %int(t))
+    MSE_best_index = np.argmin(MSE_array)
+    MSE_best = np.min(MSE_array)
+    print("MSE array: ", MSE_array)
+    print("best index: ",MSE_best_index)
+    print("best MSE: ", MSE_best)
+    final_hyper = hyper[:,MSE_best_index]
+
+    print("parameters: ", final_hyper)
+    eta_best = final_hyper[0]
+    lmbd_best = final_hyper[1]
+    batch_size_best = final_hyper[2]
+    n_hidden_neurons_best = final_hyper[3]
+    epochs_best = final_hyper[4]
+    Franke_plot(X, X_train, X_test, eta=eta_best, lmbd=lmbd_best,batch_size =batch_size_best, n_hidden_neurons = n_hidden_neurons_best, epochs = epochs_best)
+    return hyper[:,MSE_best_index]
+hypertuning(100, 100, 1, -6, 1, -12, 100, 1, 500, 1)
+
+# Franke_plot_scikit(X, z, X_train, z_train)
 #MSE_train = MSE(z_train, z_pred_train)
 """eta_vals = np.arange(1,4, 0.2)#np.logspace(-1, 1, 20)#[1e-8, 1e-6,1e-4,1e-2,1e-2,1e-1]
 #print(eta_vals)
