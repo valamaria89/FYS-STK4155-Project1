@@ -15,7 +15,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.linear_model import SGDClassifier
 import matplotlib.pyplot as plt
 from functools import partial
-
+import scikitplot as skplt
 
 # Trying to set the seed
 
@@ -291,6 +291,7 @@ def logistic_regression_SKL(X_train, X_test, y_train, y_test):
     print(prob_LogReg_Skl)
     false_pos_LogReg_Skl, true_pos_LogReg_Skl = roc_curve(y_test, prob_LogReg_Skl)[0:2]
     print("Area under curve LogReg_skl: ", auc(false_pos_LogReg_Skl, true_pos_LogReg_Skl))
+    plt.show()
 
     plt.plot([0, 1], [0, 1], "k--")
     plt.plot(false_pos_LogReg_Skl, true_pos_LogReg_Skl, label="LogReg")
@@ -299,7 +300,7 @@ def logistic_regression_SKL(X_train, X_test, y_train, y_test):
     plt.ylabel("True Positive rate")
     plt.title("ROC curve")
     plt.show()
-    return prob
+    return
 
 
 #final_betas, cost_all = train(X_train_scaled, y_train, beta_init, eta, n_iter, 1e-04)
@@ -386,7 +387,7 @@ def Plots(ROC_plot, GD_plot, MB_GD_plot, Stoch_GD_plot, Newton_plot, Scatter_GD_
         plt.show()
 
 
-Plots(1, 0, 0, 0, 0, 0)
+# Plots(1, 0, 0, 0, 0, 0)
 logistic_regression_SKL(X_train_scaled, X_test_scaled, y_train, y_test)
 
 # Plots(0, 0, 1, 0, 0)
