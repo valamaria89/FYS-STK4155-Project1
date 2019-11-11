@@ -41,16 +41,38 @@ from NeuralNetwork import NeuralNetwork as NN
 
 np.set_printoptions(threshold=sys.maxsize)
 
-seed = 43
+seed = 3000
 np.random.seed(seed)
 
-x = np.arange(0, 1, 0.05)
-y = np.arange(0, 1, 0.05)
+x = np.arange(0, 1, 0.02)
+y = np.arange(0, 1, 0.02)
 
 
 n = x.size
 x, y = np.meshgrid(x,y)
 
+def threeSquares(low_n, high_n, l_perc, h_perc):
+    for n in range(low_n, high_n+1):
+        a = 1
+        while a * a <= n:
+            b = 1
+            while b**2 <= n:
+                c = 1
+                while c**2 < n:
+                    step = str(1/m.sqrt(n))
+                    integer, floating = step.split(".")
+                    if (a*a + b*b + c*c == n and (l_perc*n <= a**2 + b**2 <= h_perc*n) and 0.5 <= a**2/b**2 <= 1.5 and len(floating) <= 12) :
+                        print("floating", floating)
+                        print("")
+                        print(a, "^2 + ", b, "^2 + ",c,"^2 + ", " n = " ,n)
+                        print(a**2/n, " + ", b**2/n, " + ", c**2/n, " = 1")
+                        print("step size", 1/m.sqrt(n))
+                    c+=1
+                b+=1
+            a+=1
+
+
+#threeSquares(1000,5000, 0.1, 0.6)
 
 
 def FrankeFunction(x,y):
@@ -60,15 +82,29 @@ def FrankeFunction(x,y):
     term4 = -0.2*np.exp(-(9*x-4)**2 - (9*y-7)**2)
     return term1 + term2 + term3 + term4
 
-z = FrankeFunction(x, y)
-#print(z.shape)
-z = np.ravel(z)
+z = FrankeFunction(x,y)
+z_noise = FrankeFunction(x,y)
 
-noise = np.random.randn(z.shape[0])#*0.001
-#z += noise
+z = np.ravel(z)
+z_noise = np.ravel(z_noise)
+noise = np.random.randn(z_noise.shape[0])*0.00001
+
+z_noise += noise
+
 shape = (x.shape[0]**2,1)
 z.shape = shape
+z_noise.shape = shape
 
+def shuffle(X, z):
+    shuffle_ind = np.arange(X.shape[0])
+    np.random.seed(seed)
+    np.random.shuffle(shuffle_ind)
+    Xshuffled = np.zeros(X.shape)
+    zshuffled = np.zeros(z.shape)
+    for ind in range(X.shape[0]):
+        Xshuffled[ind] = X[shuffle_ind[ind]]
+        zshuffled[ind] = z[shuffle_ind[ind]]
+    return Xshuffled, zshuffled
 
 ### Code taken from Piazza from Morten Hjort-Jensen 
 
@@ -89,14 +125,30 @@ def CreateDesignMatrix_X(x, y, n ):
         q = int((i)*(i+1)/2)
         for k in range(i+1):
             X[:,q+k] = x**(i-k) * y**k
-
-    return X
+    #print("X: ", np.argmax(X))
+    #print("z: ", z[np.argmax(X)])
+    #X_train, X_test, z_train, z_test = train_test_split(X, z, test_size=0.36, random_state=seed, shuffle=False)
+    #X_test, X_val, z_test, z_val = train_test_split(X_test, z_test, test_size=0.36, random_state=seed, shuffle=False) 
+    #X_train_shuffle, X_test_shuffle, z_train_shuffle, z_test_shuffle = train_test_split(X, z, test_size=0.36, random_state=seed, shuffle=True)
+    #X_test_shuffle, X_val_shuffle, z_test_shuffle, z_val_shuffle = train_test_split(X_test_shuffle, z_test_shuffle, test_size=0.36, random_state=seed, shuffle=True) 
+    #print("z_train: ", z_train)
+    #X_train_shuffle, z_train_shuffle = shuffle(X_train, z_train)
+    #X_test_shuffle, z_test_shuffle = shuffle(X_test, z_test)
+    #X_val_shuffle, z_val_shuffle = shuffle(X_val, z_val)
+    #print("z_train_shuffle: ",z_train_shuffle)  
+    #print("X_train: ", np.argmax(X_train_shuffle))
+    #print("z_train: ", z_train[np.argmax(X_train_shuffle)])     
+    
+    return X #X_train, X_test, X_train_shuffle, X_test_shuffle, X_val_shuffle, z_train, z_test, z_train_shuffle, z_test_shuffle, z_val_shuffle
 
 X = CreateDesignMatrix_X(x,y,4)
 
 
-X_train, X_test, z_train, z_test = train_test_split(X, z, test_size=0.2, random_state=seed)
-X_test, X_val, z_test, z_val = train_test_split(X_test, z_test, test_size= 0.51, random_state=seed)
+#X, X_train, X_test, X_train_shuffle, X_test_shuffle, X_val_shuffle, z_train, z_test, z_train_shuffle, z_test_shuffle, z_val_shuffle = CreateDesignMatrix_X(x,y,4)
+
+X_train, X_test, z_train, z_test = train_test_split(X, z, test_size=0.36, random_state=seed, shuffle=False)
+
+
 
 
 
@@ -125,13 +177,15 @@ def MSE(z, z_tilde):
 #1.68743568e-01 8.39312950e-12 9.10000000e+01 3.90000000e+02
 # 2.04000000e+02
 
-def Franke_plot(X,X_train,X_test, eta=0, lmbd=0,batch_size =0, n_hidden_neurons = 0, epochs = 0):
+def Franke_plot(X,X_train,X_test, z_train, eta=0, lmbd=0,batch_size =0, n_hidden_neurons = 0, epochs = 0):
 
-    # eta = 4.33148322e-03
-    # lmbd = 3.75469422e-11
-    # batch_size = 2
-    # n_hidden_neurons = 422
-    # epochs = 197
+    eta = 4.33148322e-03
+    lmbd = 3.75469422e-11
+    batch_size = 2
+    n_hidden_neurons = 422
+    epochs = 197
+    # For these parameters above we got: MSE = 0.004922969949345497 R2-score =0.9397964833194705
+
 
     n_categories = 1
 
@@ -140,7 +194,7 @@ def Franke_plot(X,X_train,X_test, eta=0, lmbd=0,batch_size =0, n_hidden_neurons 
                         cost_grad = 'MSE', activation = 'sigmoid', activation_out='ELU')
     dnn.train_and_validate()
     z_pred = dnn.predict_probabilities(X)
-
+    print('X: ', X)
     print(mean_squared_error(z, z_pred))
     print(r2_score(z, z_pred))
     xsize = x.shape[0]
@@ -156,25 +210,112 @@ def Franke_plot(X,X_train,X_test, eta=0, lmbd=0,batch_size =0, n_hidden_neurons 
     z_predict_mesh = np.reshape(z_pred, (ysize, xsize))
 
     fig, axs = plt.subplots(1, 2, subplot_kw={'projection': '3d'})
-    # plt.figure()
+    
 
     ax = fig.axes[0]
     ax.plot_surface(X, Y, z_predict_mesh, cmap=cm.viridis, linewidth=0)
-    ax.set_title('Fitted terrain cut')
+    ax.set_title('Fitted Franke')
 
     ax = fig.axes[1]
     ax.plot_surface(X, Y, z_mesh, cmap=cm.viridis, linewidth=0)
-    ax.set_title('Terrain cut')
+    ax.set_title('Real Franke')
 
     plt.xlabel('X')
     plt.ylabel('Y')
 
     plt.show()
+#Franke_plot(X,X_train,X_test)
+    
+def Franke_plot_overfitting(X_train,X_test, eta=0, lmbd=0,batch_size =0, n_hidden_neurons = 0, epochs = 0):
 
-    #z_pred_train = dnn.predict_probabilities(X_train)
-    #z_pred_val = dnn.predict_probabilities(X_val)
+    eta = 4.33148322e-03
+    lmbd = 3.75469422e-11
+    batch_size = 2
+    n_hidden_neurons = 422
+    epochs = 1000
+    
 
-# Franke_plot(X,X_train,X_test)
+
+    n_categories = 1
+
+    dnn = NN(X_train, z_train, eta=eta, lmbd=lmbd, epochs=int(epochs), batch_size=batch_size,
+                        n_hidden_neurons=n_hidden_neurons, n_categories=n_categories,
+                        cost_grad = 'MSE', activation = 'sigmoid', activation_out='ELU')
+    dnn.train_and_validate(X_train, z_train, MSE_store=True)
+    MSE_train = dnn.MSE_epoch()
+    np.random.seed(seed)
+    dnn = NN(X_train, z_train, eta=eta, lmbd=lmbd, epochs=int(epochs), batch_size=batch_size,
+                    n_hidden_neurons=n_hidden_neurons, n_categories=n_categories,
+                    cost_grad = 'MSE', activation = 'sigmoid', activation_out='ELU')
+    dnn.train_and_validate(X_test, z_test, MSE_store=True)
+    MSE_test = dnn.MSE_epoch()
+    epo = np.arange(len(MSE_train))
+    plt.plot(epo, MSE_test, label='MSE test')
+    plt.plot(epo, MSE_train, label='MSE train')
+    plt.xlabel("Number of epochs")
+    plt.ylabel("MSE")
+    plt.title("MSE vs epochs")
+    plt.legend()
+    plt.show()
+
+#Franke_plot_overfitting(X_train,X_test)   
+#print(z_test)
+print(z_train)
+def Franke_plot_overfit_3D(X, X_train,X_test, z_train, z_test, eta=0, lmbd=0,batch_size =0, n_hidden_neurons = 0, epochs = 0):
+    
+    eta = 4.33148322e-03
+    lmbd = 3.75469422e-11
+    batch_size = 2
+    n_hidden_neurons = 422
+    epochs = 200
+    n_categories = 1
+
+    np.random.seed(seed)
+    dnn = NN(X_train, z_train, eta=eta, lmbd=lmbd, epochs=int(epochs), batch_size=batch_size,
+                        n_hidden_neurons=n_hidden_neurons, n_categories=n_categories,
+                        cost_grad = 'MSE', activation = 'sigmoid', activation_out='ReLu')
+    dnn.train_and_validate()
+    z_pred = dnn.predict_probabilities(X_test)
+    print(z_pred)
+    #print("X_train: ", X_train)
+    
+    print(mean_squared_error(z_test, z_pred))
+    print(r2_score(z_test, z_pred))
+    test_size = int(np.sqrt(X_test.shape[0]))
+    train_size = int(np.sqrt(X_train.shape[0]))
+
+    rows_test = np.linspace(0,1,test_size)
+    cols_test = np.linspace(0,1,test_size)
+
+    rows_train = np.linspace(0,1,train_size)
+    cols_train = np.linspace(0,1,train_size)
+
+
+    [X1, Y1] = np.meshgrid(cols_test, rows_test)
+    [X2, Y2] = np.meshgrid(cols_train, rows_train)
+
+    z_predict_mesh = np.reshape(z_pred, (test_size, test_size))
+    z_mesh = np.reshape(z_train, (train_size, train_size))
+
+    fig, axs = plt.subplots(1, 2, subplot_kw={'projection': '3d'})
+    # plt.figure()
+
+    ax = fig.axes[0]
+    ax.plot_surface(X1, Y1, z_predict_mesh, cmap=cm.viridis, linewidth=0)
+    ax.set_title('Fitted test')
+
+    ax = fig.axes[1]
+    ax.plot_surface(X2, Y2, z_mesh, cmap=cm.viridis, linewidth=0)
+    ax.set_title('Fitted train')
+
+    plt.xlabel('X')
+    plt.ylabel('Y')
+
+    plt.show()
+    
+
+Franke_plot_overfit_3D(X,X_train,X_test, z_train, z_test)
+
 
 def Franke_plot_scikit(X, z, X_train, z_train):
     eta = 4.33148322e-03
@@ -183,7 +324,7 @@ def Franke_plot_scikit(X, z, X_train, z_train):
     n_neurons_layer1 = 221
     n_neurons_layer2 = 221
     epochs = 197
-    
+    # For these parameters we got: MSE = 0.004557564498595149 and R2-score= 0.9442650649634291
     n_categories = 1
 
     dnn = MLPRegressor(hidden_layer_sizes=(422),activation='relu', solver='sgd', alpha=lmbd, batch_size=batch_size, 
@@ -208,29 +349,30 @@ def Franke_plot_scikit(X, z, X_train, z_train):
     z_predict_mesh = np.reshape(z_pred, (ysize, xsize))
 
     fig, axs = plt.subplots(1, 2, subplot_kw={'projection': '3d'})
-    # plt.figure()
 
     ax = fig.axes[0]
     ax.plot_surface(X, Y, z_predict_mesh, cmap=cm.viridis, linewidth=0)
-    ax.set_title('Fitted terrain cut')
+    ax.set_title('Fitted Franke')
 
     ax = fig.axes[1]
     ax.plot_surface(X, Y, z_mesh, cmap=cm.viridis, linewidth=0)
-    ax.set_title('Terrain cut')
+    ax.set_title('Real Franke')
 
     plt.xlabel('X')
     plt.ylabel('Y')
 
     plt.show()
 
-epochs = 1000
+#Franke_plot_scikit(X,z, X_train,z_train)
+
+#epochs = 1000
 #batch_size = 10
 #eta = 0.001
 #n_hidden_neurons = 100 #[1, 10, 20, 25, 40, 50]
 #lmbd = 0.0
-n_categories = 1 #z_train.shape[0]
+n_categories = 1 
 
-def hypertuning(iterations, cols, etamax, etamin, lmbdmax, lmbdmin, batch_sizemax, batch_sizemin, hiddenmax,hiddenmin):
+def hypertuning(iterations, cols, etamax, etamin, lmbdmax, lmbdmin, batch_sizemax, batch_sizemin, hiddenmax,hiddenmin, polymin, polymax):
 
     start_time = time.time()
     if (cols < iterations):
@@ -244,14 +386,16 @@ def hypertuning(iterations, cols, etamax, etamin, lmbdmax, lmbdmin, batch_sizema
     hyper[1] = np.logspace(lmbdmin, lmbdmax, cols)
     hyper[2] = np.round(np.linspace(batch_sizemin, batch_sizemax, cols, dtype='int'))
     hyper[3] = np.round(np.linspace(hiddenmin, hiddenmax, cols))
-    hyper[4] = np.zeros((cols))
-    #print(hyper)
+    hyper[4] = np.random.randint(polymin, polymax, size=cols, dtype='int')
+    hyper[5] = np.zeros((cols))
+    
+
+    
     for i in range(rows-1):
         np.random.shuffle(hyper[i])
 
     n_categories = 1
-    # dnn = NN(X_train, z_train, n_categories=n_categories,
-    #          cost_grad='MSE', activation='sigmoid', activation_out='ELU')
+    
 
     for it in range(iterations):
         hyper_choice = hyper[:,it]
@@ -259,27 +403,29 @@ def hypertuning(iterations, cols, etamax, etamin, lmbdmax, lmbdmin, batch_sizema
         lmbd = hyper_choice[1]
         batch_size = hyper_choice[2]
         n_hidden_neurons = hyper_choice[3]
+        X, X_train, X_test, X_train_shuffle, X_test_shuffle, X_val_shuffle, z_train, z_test, z_train_shuffle, z_test_shuffle, z_val_shuffle = CreateDesignMatrix_X(x,y, int(hyper[4][it]))
         epochs = 1000
 
-        # dnn.set_parameters(eta=eta, lmbd=lmbd, epochs=epochs, batch_size=batch_size,
-        #                 n_hidden_neurons=n_hidden_neurons)
-        dnn = NN(X_train, z_train, eta=eta, lmbd=lmbd, epochs=epochs, batch_size=batch_size, n_hidden_neurons=n_hidden_neurons, n_categories=n_categories,
+        
+        dnn = NN(X_train_shuffle, z_train_shuffle, eta=eta, lmbd=lmbd, epochs=epochs, batch_size=batch_size, n_hidden_neurons=n_hidden_neurons, n_categories=n_categories,
                  cost_grad='MSE', activation='sigmoid', activation_out='ELU')
-        dnn.train_and_validate(X_val,z_val, MSE_store = False)
-        # MSE = dnn.MSE_epoch()
-        # epo = np.arange(len(MSE))
-        # plt.plot(epo, MSE)
-        # plt.show()
+        dnn.train_and_validate(X_val_shuffle,z_val_shuffle, MSE_store = False)
+        #MSE = dnn.MSE_epoch()
+        #epo = np.arange(len(MSE))
+        #plt.plot(epo, MSE)
+        #plt.show()
         z_pred = dnn.predict_probabilities(X_test)
+        #print(z_pred)
 
         MSE_array[it] = mean_squared_error(z_test,z_pred)
-        hyper[4][it] = dnn.epoch +1
+        hyper[5][it] = dnn.epoch +1
         if (it%m.ceil((iterations/40))==0):
             print('Iteration: ', it)
             t = round((time.time() - start_time))
             if t >= 60:
                 sec = t % 60
                 print("--- %s min," % int(t/60),"%s sec ---" % sec)
+                print("Estimated minutes left: ", int((t/it)*(iterations-it)/60))
             else:
                 print("--- %s sec ---" %int(t))
     MSE_best_index = np.argmin(MSE_array)
@@ -289,105 +435,21 @@ def hypertuning(iterations, cols, etamax, etamin, lmbdmax, lmbdmin, batch_sizema
     print("best MSE: ", MSE_best)
     final_hyper = hyper[:,MSE_best_index]
 
-    print("parameters: ", final_hyper)
+    print("parameters: eta, lmbd, batch, hidden, poly, epochs ", final_hyper)
     eta_best = final_hyper[0]
     lmbd_best = final_hyper[1]
     batch_size_best = final_hyper[2]
     n_hidden_neurons_best = final_hyper[3]
-    epochs_best = final_hyper[4]
-    Franke_plot(X, X_train, X_test, eta=eta_best, lmbd=lmbd_best,batch_size =batch_size_best, n_hidden_neurons = n_hidden_neurons_best, epochs = epochs_best)
+    poly_best = final_hyper[4]
+    epochs_best = final_hyper[5]
+    Franke_plot(X, X_train, X_test, z_train,eta=eta_best, lmbd=lmbd_best,
+        batch_size =batch_size_best, n_hidden_neurons = n_hidden_neurons_best, epochs = epochs_best)
+    Franke_plot_overfit_3D(X, X_train,X_test, z_train, z_test, eta=eta_best, 
+        lmbd=lmbd_best,batch_size =batch_size_best, n_hidden_neurons = n_hidden_neurons_best, epochs = epochs_best)
     return hyper[:,MSE_best_index]
-hypertuning(100, 100, 1, -6, 1, -12, 100, 1, 500, 1)
 
-# Franke_plot_scikit(X, z, X_train, z_train)
-#MSE_train = MSE(z_train, z_pred_train)
-"""eta_vals = np.arange(1,4, 0.2)#np.logspace(-1, 1, 20)#[1e-8, 1e-6,1e-4,1e-2,1e-2,1e-1]
-#print(eta_vals)
-train_accuracy = np.zeros((len(n_hidden_neurons), len(eta_vals)))
-test_accuracy = np.zeros((len(n_hidden_neurons), len(eta_vals)))
-for i, neuron in enumerate(n_hidden_neurons):
-    for j, eta in enumerate(eta_vals):
-    
-    #print("Eta: ", eta_vals[i])
-        dnn = NeuralNetwork(X_train, z_train, eta=eta, lmbd=lmbd, epochs=epochs, batch_size=batch_size,
-                    n_hidden_neurons=neuron, n_categories=n_categories,
-                    cost_grad = 'MSE', activation = 'sigmoid') #n_categories=n_categories
+#hypertuning(2, 2, 1, -6, -4, -14, 100, 1, 100, 1, 2, 3)
 
 
-        dnn.train()
-        z_train_pred = dnn.feed_forward_out(X_train)
-        z_test_pred =dnn.feed_forward_out(X_test)
-        train_accuracy[i][j] = r2_score( z_train, z_train_pred)
-        test_accuracy[i][j] = r2_score( z_test, z_test_pred)
-
-
-
-fig, ax = plt.subplots(figsize=(6,15))
-sns.heatmap(test_accuracy, annot=True, ax=ax, cmap="viridis")
-ax.set_xticklabels(np.round(eta_vals,2))
-ax.set_yticklabels(n_hidden_neurons)
-ax.set_title("Training Accuracy")
-ax.set_ylabel("hidden neurons")
-ax.set_xlabel("$\eta$")
-plt.show()
-"""
-#eta_vals = np.logspace(-6, -1, 10) #[1e-6, 1e-4, 1e-2, 1e-1,1]#np.logspace(-5, 1, 7)
-#lmbd_vals = np.zeros()
-#train_accuracy = np.zeros((len(eta_vals), len(lmbd_vals)))
-#test_accuracy = np.zeros((len(eta_vals), len(lmbd_vals)))
-
-"""for i in range(len(eta_vals)):
- #   for j in range(len(lmbd_vals)):
-        #z_predict = 0
-    dnn = NeuralNetwork(X_train_scaled, z_train, eta=i, lmbd=j, epochs=epochs, batch_size=batch_size,
-          n_hidden_neurons=n_hidden_neurons, n_categories=n_categories,
-          cost_grad = 'MSE', activation = 'sigmoid')
-        z_predict = dnn.predict_probabilities(X_test_scaled)#[:,1:2]
-     
-        #train_accuracy[i][j] = R2(z_train, )
-        test_accuracy[i][j] = r2_score( z_test_scaled, z_predict)"""
-"""
-#print(z_test)
-fig, ax = plt.subplots(figsize=(10, 10))
-sns.heatmap(train_accuracy, annot=True, ax=ax, cmap="viridis")
-ax.set_title("Training Accuracy")
-ax.set_ylabel("$\eta$")
-ax.set_xlabel("$\lambda$")
-plt.show()
-
-fig, ax = plt.subplots(figsize=(10, 10))
-sns.heatmap(test_accuracy, annot=True, ax=ax, cmap="viridis")
-ax.set_title("Test Accuracy")
-ax.set_ylabel("$\eta$")
-ax.set_xlabel("$\lambda$")
-plt.show()    
-
-def nthLambda_error( error, nlambdas):
-    lambdas = np.logspace(-8, 5, nlambdas)
-
-
-    error_train = np.zeros((nlambdas))
-    error_test = np.zeros((nlambdas)) 
-    error_test_l = 0
-    for lamb in range(len(lambdas)):
-        dnn = NeuralNetwork(X_train, z_train, eta=eta, lmbd=lamb, epochs=epochs, batch_size=batch_size,
-                    n_hidden_neurons=n_hidden_neurons,
-                    cost_grad = 'MSE', activation = 'sigmoid')  
-        dnn.train()
-        z_predict = dnn.predict_probabilities(X_test)[:,1:2]
-        if (error == 'MSE'):
-            #error_train_l = MSE(z_train, z_predict)
-            error_test_l = MSE(z_test, z_predict)
-
-        if(error == "R2"):
-            #error_train_l = R2(z_train, z_predict)
-            error_test_l = R2(z_test, z_predict)
-                
-        #error_train[lamb] = error_train_l
-        error_test[lamb] = error_test_l
-
-    #plt.plot(np.log10(lambdas), error_train_mean)
-    plt.plot(np.log10(lambdas), error_test)
-    plt.show()"""
 
 
