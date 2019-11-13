@@ -5,13 +5,6 @@ import xlrd
 import sys
 from scipy.optimize import fmin_tnc
 np.set_printoptions(threshold=sys.maxsize)
-
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import OneHotEncoder
-from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.metrics import confusion_matrix, accuracy_score, roc_auc_score, roc_curve, auc
-from sklearn.linear_model import LogisticRegression
 import matplotlib.pyplot as plt
 from functools import partial
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
@@ -20,52 +13,7 @@ import math
 
 seed = 3000
 np.random.seed(seed)
-"""pd.set_option('display.max_rows', None)
-pd.set_option('display.max_columns', None)
-pd.set_option('display.width', None)
-pd.set_option('display.max_colwidth', -1)
 
-# Reading file into data frame
-cwd = os.getcwd()
-filename = cwd + '/default of credit card clients.xls'
-# filename = cwd + '/test.xls'
-nanDict = {}
-df = pd.read_excel(filename, header=1, skiprows=0, index_col=0, na_values=nanDict)
-df.rename(index=str, columns={"default payment next month": "defaultPaymentNextMonth"}, inplace=True)
-
-df['EDUCATION']=np.where(df['EDUCATION'] == 5, 4, df['EDUCATION'])
-df['EDUCATION']=np.where(df['EDUCATION'] == 6, 4, df['EDUCATION'])
-df['EDUCATION']=np.where(df['EDUCATION'] == 0, 4, df['EDUCATION'])
-
-df['MARRIAGE']=np.where(df['MARRIAGE'] == 0, 3, df['MARRIAGE'])
-df['MARRIAGE'].unique()
-
-X = df.loc[:, df.columns != 'defaultPaymentNextMonth'].values
-y = df.loc[:, df.columns == 'defaultPaymentNextMonth'].values
-
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=seed)
-
-
-scaler = StandardScaler()
-scaler.fit(X_train)
-X_train_scaled = scaler.transform(X_train)
-X_test_scaled = scaler.transform(X_test)
-
-
-# one-hot in numpy
-def to_categorical_numpy(integer_vector):
-    n_inputs = len(integer_vector)
-    n_categories = np.max(integer_vector) + 1
-    onehot_vector = np.zeros((n_inputs, n_categories))
-    onehot_vector[range(n_inputs), integer_vector] = 1
-
-    return onehot_vector
-
-
-# Y_train_onehot, Y_test_onehot = to_categorical(Y_train), to_categorical(Y_test)
-# y_train_onehot, y_test_onehot = to_categorical_numpy(y_train), to_categorical_numpy(y_test)
-
-"""
 class NeuralNetwork:
     def __init__(
             self,
@@ -332,33 +280,3 @@ class NeuralNetwork:
                     if(self.validate_and_early_stopping(X_val, y_val)): return
 
 
-"""epochs = 20
-batch_size = 10
-eta = 15
-lmbd = 0.01
-n_hidden_neurons = 30
-n_categories = 2
-
-dnn = NeuralNetwork(X_train_scaled, y_train, eta=eta, lmbd=lmbd, epochs=epochs, batch_size=batch_size,
-                    n_hidden_neurons=n_hidden_neurons, n_categories=n_categories,
-                    cost_grad = 'crossentropy', activation = 'sigmoid', activation_out='ELU')
-dnn.train()
-test_predict = dnn.predict(X_test_scaled)
-test_predict1 = dnn.predict_probabilities(X_test_scaled)[:,1:2]
-#
-# accuracy score from scikit library
-#print("Accuracy score on test set: ", accuracy_score(y_test, test_predict))
-#
-# def accuracy_score_numpy(Y_test, Y_pred):
-#     return np.sum(Y_test == Y_pred) / len(Y_test)
-
-#print(test_predict1)
-
-false_pos, true_pos = roc_curve(y_test, test_predict1)[0:2]
-print("Area under curve ST: ", auc(false_pos, true_pos))
-plt.plot([0, 1], [0, 1], "k--")
-plt.plot(false_pos, true_pos)
-plt.xlabel("False Positive rate")
-plt.ylabel("True Positive rate")
-plt.title("ROC curve gradient descent")
-plt.show()"""

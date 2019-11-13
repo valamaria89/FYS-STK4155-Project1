@@ -43,27 +43,6 @@ nanDict = {}
 df = pd.read_excel(filename, header=1, skiprows=0, index_col=0, na_values=nanDict)
 df.rename(index=str, columns={"default payment next month": "defaultPaymentNextMonth"}, inplace=True)
 
-"""df = df.drop(df[(df.BILL_AMT1 == 0) &
-                (df.BILL_AMT2 == 0) &
-                (df.BILL_AMT3 == 0) &
-                (df.BILL_AMT4 == 0) &
-                (df.BILL_AMT5 == 0) &
-                (df.BILL_AMT6 == 0)].index)
-
-df = df.drop(df[(df.PAY_AMT1 == 0) &
-                (df.PAY_AMT2 == 0) &
-                (df.PAY_AMT3 == 0) &
-                (df.PAY_AMT4 == 0) &
-                (df.PAY_AMT5 == 0) &
-                (df.PAY_AMT6 == 0)].index)
-
-df = df.drop(df[(df.PAY_0 ==0) &
-                (df.PAY_2 == 0) &
-                (df.PAY_3 == 0) &
-                (df.PAY_4 == 0) &
-                (df.PAY_5 == 0) &
-                (df.PAY_6 == 0)].index)
-"""
 
 
 df['EDUCATION']=np.where(df['EDUCATION'] == 5, 4, df['EDUCATION'])
@@ -73,13 +52,7 @@ df['EDUCATION']=np.where(df['EDUCATION'] == 0, 4, df['EDUCATION'])
 df['MARRIAGE']=np.where(df['MARRIAGE'] == 0, 3, df['MARRIAGE'])
 df['MARRIAGE'].unique()
 
-#df.drop('ID', axis = 1, inplace =True)
 
-#df.info()
-
-#categorical_subset = pd.get_dummies(categorical_subset[categorical_subset.columns.drop("defaultPaymentNextMonth")])
-# Features and targets
-#X = df.drop('defaultPaymentNextMonth', axis = 1, inplace = False)
 X = df.loc[:, df.columns != 'defaultPaymentNextMonth'].values
 y = df.loc[:, df.columns == 'defaultPaymentNextMonth'].values
 
@@ -113,53 +86,8 @@ def to_categorical_numpy(integer_vector):
     return onehot_vector
 
 y_train_onehot, y_test_onehot = to_categorical_numpy(y_train), to_categorical_numpy(y_test)
-#X_val_scaled = scaler.transform(X_val)
-
-# Categorical variables to one-hot's
-"""onehotencoder = OneHotEncoder(categories="auto") #What does auto do ? 
 
 
-X = ColumnTransformer(
-    [("", onehotencoder, [3]),],
-    remainder="passthrough"
-).fit_transform(X) #Why do we only do this on the marriage column? 
-
-
-
-y.shape
-
-# Train-test split
-trainingShare = 0.5
-seed  = 1000
-XTrain, XTest, yTrain, yTest=train_test_split(X, y, train_size=trainingShare, \
-                                              test_size = 1-trainingShare,
-                                             random_state=seed)
-
-
-# Input Scaling
-sc = StandardScaler()
-XTrain = sc.fit_transform(XTrain)
-XTest = sc.transform(XTest)
-
-# One-hot's of the target vector
-Y_train_onehot, Y_test_onehot = onehotencoder.fit_transform(yTrain), onehotencoder.fit_transform(yTest) # Why do you do this? 
-"""
-
-# Remove instances with zeros only for past bill statements or paid amounts
-'''
-df = df.drop(df[(df.BILL_AMT1 == 0) &
-                (df.BILL_AMT2 == 0) &
-                (df.BILL_AMT3 == 0) &
-                (df.BILL_AMT4 == 0) &
-                (df.BILL_AMT5 == 0) &
-                (df.BILL_AMT6 == 0) &
-                (df.PAY_AMT1 == 0) &
-                (df.PAY_AMT2 == 0) &
-                (df.PAY_AMT3 == 0) &
-                (df.PAY_AMT4 == 0) &
-                (df.PAY_AMT5 == 0) &
-                (df.PAY_AMT6 == 0)].index)
-'''
 def Correlation(df):
     del df['defaultPaymentNextMonth']
     sns.set()
@@ -300,7 +228,8 @@ def SciKitLearn_Classification():
   
     
     Score = (np.trapz(y_, x=x_) - 0.5)/(np.trapz(best_line, dx=(1/len(y_predict)))-0.5)
-    print(Score) #Area ratio 0.4791027525012573
+    print(Score)  #Area ratio 0.4791027525012573
+
 #SciKitLearn_Classification()
 
 def Plots(ROC_plot, Lift_plot_test_NN, Lift_plot_train_NN, Lift_plot_MB, GD_plot, MB_GD_plot, Stoch_GD_plot, Newton_plot, Scatter_GD_plot):
@@ -510,9 +439,9 @@ def Plots(ROC_plot, Lift_plot_test_NN, Lift_plot_train_NN, Lift_plot_MB, GD_plot
         np.random.seed(seed)
 
         beta_init = np.random.randn(X_train.shape[1],1)
-        w1 = Weight(X_train_scaled,y_train,beta_init,0.002069138081114788, 30)
+        w1 = Weight(X_train_scaled,y_train,beta_init,3.59381366e-05, 350)
 
-        final_betas_MB,_ = w1.train(w1.stochastic_gradient_descent)
+        final_betas_MB,_ = w1.train(w1.gradient_descent)
         prob_MB, y_pred_MB = classification(X_test_scaled,final_betas_MB, y_test)[0:2]
         
         y_pred = np.concatenate((1-prob_MB,prob_MB),axis=1)
