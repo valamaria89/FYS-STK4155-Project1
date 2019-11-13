@@ -24,7 +24,7 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 import random
-seed = 42
+seed = 3000
 random.seed(seed)
 
 pd.set_option('display.max_rows', None)
@@ -154,8 +154,8 @@ class NeuralNetworkTensorflow:
 
     def create_accuracy(self):
         with tf.compat.v1.name_scope('accuracy'):
-            probabilities = tf.nn.softmax(self.z_out)
-            predictions = tf.argmax(input=probabilities, axis=1)
+            self.probabilities = tf.nn.softmax(self.z_out)
+            predictions = tf.argmax(input=self.probabilities, axis=1)
             labels = tf.argmax(input=self.Y, axis=1)
 
             correct_predictions = tf.equal(predictions, labels)
@@ -192,26 +192,30 @@ class NeuralNetworkTensorflow:
                     accuracy = sess.run(DNN.accuracy,
                                         feed_dict={DNN.X: batch_X,
                                                    DNN.Y: batch_Y})
+
                     step = sess.run(DNN.global_step)
+                self.probabilities = sess.run([DNN.accuracy],feed_dict={DNN.X: self.X_test,DNN.Y: self.Y_test})
+                
             self.train_loss, self.train_accuracy = sess.run([DNN.loss, DNN.accuracy],
                                                             feed_dict={DNN.X: self.X_train,
                                                                        DNN.Y: self.Y_train})
 
-            self.test_loss, self.test_accuracy = sess.run([DNN.loss, DNN.accuracy],
+            self.test_loss, self.test_accuracy, self.probabilities = sess.run([DNN.loss, DNN.accuracy, DNN.accuracy],
                                                           feed_dict={DNN.X: self.X_test,
                                                                      DNN.Y: self.Y_test})
             print("test.Acurracy: ", self.test_accuracy)
+
 
 """tf.Session() initiates a TensorFlow Graph object in which tensors are processed through operations (or ops).
 The with block terminates the session as soon as the operations are completed.
 Hence, there is no need for calling Session.close. Also, a session contains variables, global variables, placeholders, and ops.
 Hence we call tf.global_variables_initializer().run()
 A graph contains tensors and operations. To initiate a graph, a session is created which runs the graph. In other words, graph provides a schema whereas a session processes a graph to compute values( tensors )."""
-"""
-epochs = 2
+
+epochs = 10
 batch_size = 100
-#eta = 0.01
-#lmbd = 0.01
+eta = 0.01
+lmbd = 1
 n_neurons_layer1 = 10
 n_neurons_layer2 = 5
 n_categories = 2
@@ -220,21 +224,22 @@ lmbd_vals = np.logspace(-5, 1, 7) #[1e-6, 1e-4, 1e-2, 1e-1,1]
 
 DNN_tf = np.zeros((len(eta_vals), len(lmbd_vals)), dtype=object)
 
-for i, eta in enumerate(eta_vals):
-    for j, lmbd in enumerate(lmbd_vals):
-        DNN = NeuralNetworkTensorflow(X_train_scaled, y_train_onehot, X_test_scaled, y_test_onehot, n_neurons_layer1=n_neurons_layer1,
-                                      n_neurons_layer2=n_neurons_layer2,
-                                      n_categories=n_categories, epochs=epochs, batch_size=batch_size, eta=eta,
-                                      lmbd=lmbd)
-        DNN.fit()
+#for i, eta in enumerate(eta_vals):
+ #   for j, lmbd in enumerate(lmbd_vals):
+DNN = NeuralNetworkTensorflow(X_train_scaled, y_train_onehot, X_test_scaled, y_test_onehot, n_neurons_layer1=n_neurons_layer1,
+      n_neurons_layer2=n_neurons_layer2,
+      n_categories=n_categories, epochs=epochs, batch_size=batch_size, eta=eta,
+      lmbd=lmbd)
+DNN.fit()
 
-        DNN_tf[i][j] = DNN
-        print(DNN)
+        #DNN_tf[i][j] = DNN
+        #print(DNN)
 
-        print("Learning rate = ", eta)
-        print("Lambda = ", lmbd)
-        print("Test accuracy: %.3f" % DNN.test_accuracy)
-
+print("Learning rate = ", eta)
+print("Lambda = ", lmbd)
+print("Probabilities: %.3f" % DNN.probabilities)
+print()
+"""
 # optional
 # visual representation of grid search
 # uses seaborn heatmap, could probably do this in matplotlib
@@ -264,6 +269,4 @@ sns.heatmap(test_accuracy, annot=True, ax=ax, cmap="viridis")
 ax.set_title("Test Accuracy")
 ax.set_ylabel("$\eta$")
 ax.set_xlabel("$\lambda$")
-plt.show()
-
-"""
+plt.show()"""

@@ -18,7 +18,7 @@ from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 import random
 import math
 
-seed = 43
+seed = 3000
 np.random.seed(seed)
 """pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
@@ -114,6 +114,7 @@ class NeuralNetwork:
         self.MSE_val = 0
         self.MSE_val_best = 10
         self.MSE_val_old = 0
+        self.MSE_check = 0
 
 
         self.hidden_weights_stored = None
@@ -133,7 +134,7 @@ class NeuralNetwork:
         return np.nan_to_num(siggy)
 
     def ReLu(self, z):
-        return np.nan_to_num(np.maximum(z,0))
+        return np.maximum(z,0)
 
     def Leaky_ReLu(self,z):
         return np.nan_to_num(np.where(z<=0, self.alpha*z, z))
@@ -151,7 +152,7 @@ class NeuralNetwork:
         return np.nan_to_num(a*(1-a))
     
     def ReLu_grad(self, a):
-        return np.nan_to_num((a > 0) * 1)
+        return 1. * (a > 0)
 
     def Leaky_ReLu_grad(self, a):
         return  np.nan_to_num(np.where(a<=0, self.alpha, 1))
@@ -169,32 +170,6 @@ class NeuralNetwork:
     def MSE(self, a, y):
         return (a-y)    
 
-    def set_parameters(self, eta, lmbd, epochs, batch_size, n_hidden_neurons):
-        self.create_biases_and_weights()
-        self.eta = eta
-        self.lmbd = lmbd
-        self.epochs = epochs
-        self.batch_size = int(batch_size)
-        self.n_hidden_neurons = int(n_hidden_neurons)
-        self.X_data = self.X_data_full
-        self.Y_data = self.Y_data_full
-        self.epoch = 0
-        self.y_predict_epochs = None
-        self.y_val = None
-        self.avrg_counter = 0
-        self.MSE_val_stored = 0
-        self.MSE_val_tot = 0
-        self.MSE_val = 0
-        self.MSE_val_best = 10
-
-        self.hidden_weights_stored = None
-        self.output_weights_stored = None
-        self.hidden_bias_stored = None
-        self.output_bias_stored = None
-        self.hidden_weights_old = None
-        self.output_weights_old = None
-        self.hidden_bias_old = None
-        self.output_bias_old = None
 
     def create_biases_and_weights(self):
         self.hidden_weights = np.random.randn(self.n_features, self.n_hidden_neurons)#*1e-3
@@ -260,10 +235,13 @@ class NeuralNetwork:
         if not (self.MSE_store):
             print("Run train_and_validate again with MSE_store = True")
             return
-        MSE = np.zeros((self.epoch+1))
+        #print(self.epoch)
+        MSE_val = np.zeros((self.epoch+1))
+        MSE_train = np.zeros((self.epoch+1))
         for i in range(self.epoch+1):
-            MSE[i] = mean_squared_error(self.y_val.flatten(), self.y_predict_epochs[i])
-        return MSE
+            MSE_val[i] = mean_squared_error(self.y_val.flatten(), self.y_predict_epochs[i])
+            MSE_train[i] = mean_squared_error(self.Y_data_full.flatten(), self.y_predict_train_epochs[i])
+        return MSE_val, MSE_train
 
     def validate_and_early_stopping(self, X_val, y_val):
 
@@ -272,13 +250,20 @@ class NeuralNetwork:
         y_pred_epoch = self.predict_probabilities(X_val)
         self.MSE_val = mean_squared_error(y_val, y_pred_epoch.flatten())
         check_area = 50
+
+
         if ((self.MSE_val_old != 0) and (self.MSE_val / self.MSE_val_old >= 10)):  # ad hoc settings. This one breaks if we have enormous spikes
             return True
 
-        elif((round(self.MSE_val_oldest,7) == round(self.MSE_val_old,7) == round(self.MSE_val,7)) and (self.epoch > 50)):
+        elif((round(self.MSE_val_oldest,7) == round(self.MSE_val_old,7) == round(self.MSE_val,7)) and (self.epoch > 10)):
             return True
 
-        # print(self.MSE_val)
+        if(self.epoch % 15 == 0) and (self.epoch < 100):
+            if (round(self.MSE_val,3)==round(self.MSE_check,3)):
+                return True
+            else:
+                self.MSE_check = self.MSE_val
+
         if (self.avrg_counter > 0):
             self.MSE_val_tot += self.MSE_val
             if (self.avrg_counter == 1):
@@ -297,7 +282,7 @@ class NeuralNetwork:
                     MSE_average = 0
                     self.MSE_val_tot = 0
             self.avrg_counter -= 1
-        elif((self.MSE_val > self.MSE_val_old) and (self.avrg_counter == 0) and (self.epoch > 100)):
+        elif((self.MSE_val > self.MSE_val_old) and (self.avrg_counter == 0) and (self.epoch > 50)):
             self.avrg_counter = check_area-1
             self.MSE_val_stored = self.MSE_val_old
             self.MSE_val_tot = self.MSE_val
@@ -313,13 +298,15 @@ class NeuralNetwork:
         self.output_bias_old = self.output_bias
         return False
 
-    def train_and_validate(self, X_val = None, y_val = None , MSE_store=False):
+    def train_and_validate(self, X_val = None, y_val = None , MSE_store=False, validate =False):
         # If there's no parameters passed to the method than it will train, if there is then it will train and validate with validate_and_early_stopping
-        if ((X_val is not None) and (MSE_store)):
-            self.y_predict_epochs = np.zeros((self.epochs,y_val.shape[0]))
+        if (X_val is not None):
             self.y_val = y_val
-            self.MSE_store = True
-        else: self.MSE_store = False
+            if(MSE_store):
+                self.MSE_store = True
+                self.y_predict_epochs = np.zeros((self.epochs,self.y_val.shape[0]))
+                self.y_predict_train_epochs = np.zeros((self.epochs,self.Y_data_full.shape[0]))
+            else: self.MSE_store = False
 
         data_indices = np.arange(self.n_inputs)
         for i in range(self.epochs):
@@ -340,7 +327,9 @@ class NeuralNetwork:
             if (X_val is not None):
                 if(MSE_store):
                     self.y_predict_epochs[i] = self.predict_probabilities(X_val).flatten()
-                if(self.validate_and_early_stopping(X_val, y_val)): return
+                    self.y_predict_train_epochs[i] = self.predict_probabilities(self.X_data_full).flatten()
+                if(validate):
+                    if(self.validate_and_early_stopping(X_val, y_val)): return
 
 
 """epochs = 20
