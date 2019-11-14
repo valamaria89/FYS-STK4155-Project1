@@ -32,8 +32,8 @@ np.set_printoptions(threshold=sys.maxsize)
 seed = 3000
 np.random.seed(seed)
 
-x = np.arange(0, 1, 0.05)
-y = np.arange(0, 1, 0.05)
+x = np.arange(0, 1, 0.01)
+y = np.arange(0, 1, 0.01)
 n = x.size
 x, y = np.meshgrid(x,y)
 
@@ -41,7 +41,7 @@ z = FrankeFunction(x,y)
 z = np.ravel(z)
 
 noise = np.random.randn(z.shape[0])*0.1
-z += noise
+#z += noise
 
 shape = (x.shape[0]**2,1)
 z.shape = shape
@@ -129,7 +129,7 @@ def Franke_plot_fit_3D(X, z, X_train,X_test, z_train, z_test, indicies, eta=0, l
     lmbd = 2.68269580e-08
     batch_size = 1
     n_hidden_neurons = 57
-    epochs = 90
+    epochs = 91
     n_categories = 1
 
     # With the parameters above we got these values for MSE and R2 for 10 000 points and no noise:
@@ -192,11 +192,11 @@ def Franke_plot_fit_3D(X, z, X_train,X_test, z_train, z_test, indicies, eta=0, l
     fig, axs = plt.subplots(1, 3, subplot_kw={'projection': '3d'})
 
     ax = fig.axes[0]
-    ax.plot_surface(X1, Y1, z_predict_mesh_test, cmap=cm.viridis,rstride=1, cstride=1, antialiased = True, linewidth=0)
+    ax.scatter3D(X1, Y1, z_predict_mesh_test, cmap=cm.viridis,linewidth=0, s=1.3)
     ax.set_title('Fitted test')
 
     ax = fig.axes[1]
-    ax.plot_surface(X2, Y2, z_predict_mesh_train, cmap=cm.viridis, linewidth=0)
+    ax.scatter3D(X2, Y2, z_predict_mesh_train, cmap=cm.viridis, linewidth=0, s=1.3)
     ax.set_title('Fitted train')
 
     ax = fig.axes[2]
@@ -210,7 +210,7 @@ def Franke_plot_fit_3D(X, z, X_train,X_test, z_train, z_test, indicies, eta=0, l
 
 
 
-#Franke_plot_overfit_3D(X, z, X_train,X_test, z_train, z_test, indicies)
+Franke_plot_fit_3D(X, z, X_train,X_test, z_train, z_test, indicies)
 
 
 def Franke_plot_scikit(X, z, X_train, z_train):
