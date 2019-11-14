@@ -29,7 +29,7 @@ from NeuralNetwork import NeuralNetwork as NN
 
 np.set_printoptions(threshold=sys.maxsize)
 
-seed = 3500
+seed = 3000
 np.random.seed(seed)
 
 x = np.arange(0, 1, 0.05)
@@ -129,7 +129,7 @@ def Franke_plot_fit_3D(X, z, X_train,X_test, z_train, z_test, indicies, eta=0, l
     lmbd = 2.68269580e-08
     batch_size = 1
     n_hidden_neurons = 57
-    epochs = 91
+    epochs = 90
     n_categories = 1
 
     # With the parameters above we got these values for MSE and R2 for 10 000 points and no noise:
