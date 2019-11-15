@@ -110,4 +110,12 @@ def backshuffle(X, z, X_train_s, X_test_s, z_train_s ,z_test_s ,indicies):
         X_test[test_indicies[ind]] = X_test_s[ind]
         
 
-    return X_train, X_test           
+    return X_train, X_test
+
+#Used to find minibatches that don't create a remainder when m = int(self.X_all.shape[0]/M) in Weight.py
+def minibatch_check(batch_size_min, bath_size_max, X_length):
+    for batch_size in range (batch_size_min, bath_size_max+1):
+        if(X_length % batch_size == 0):
+            print(batch_size)
+
+# minibatch_check(1, 200, 24000)

@@ -16,14 +16,16 @@ For the Credit Card data-case the AUC was used to find the combination of best p
 
 seed = 3000
 
-def hypertuning_franke(z, x, y, iterations, cols, etamin, etamax, lmbdmin, lmbdmax, batch_sizemin, batch_sizemax, hiddenmin,hiddenmax, polymin, polymax, plot_MSE = False):
+# cols is number of columns, which corresponds to number of different parameter-configurations. This must be larger than number of iterations.
+# plot_MSE let's you see the MSE plot for every epoch. The function validate_and_early_stopping can be turned off by validate = False. Meaning that it will run to full epoch everytime.
+# In that case MSE comparison between train and validation set is still possible(plot_MSE = True and validate = False). Useful to illustrate overfitting.
+def hypertuning_franke(z, x, y, iterations, cols, etamin, etamax, lmbdmin, lmbdmax, batch_sizemin, batch_sizemax, hiddenmin,hiddenmax, polymin, polymax, epochs = 1000, plot_MSE = False, validate = True):
 
     start_time = time.time()
     if (cols < iterations):
         cols = iterations
         print("cols must be larger than 'iterations. Cols is set equal to iterations")
-    sig = signature(hypertuning_franke)
-    rows = int(len(sig.parameters)/2)-2
+    rows = 6
     hyper = np.zeros((rows, cols))
     MSE_array = np.zeros(iterations)
     #Making the matrix of parameters 
@@ -49,19 +51,18 @@ def hypertuning_franke(z, x, y, iterations, cols, etamin, etamax, lmbdmin, lmbdm
         batch_size = hyper_choice[2]
         n_hidden_neurons = hyper_choice[3]
         X, X_train, X_test, X_val, z_train, z_test, z_val, indicies = CreateDesignMatrix_X(z, x,y, int(hyper[4][it]))
-        epochs = 1000
 
         np.random.seed(seed)
         dnn = NN(X_train, z_train, eta=eta, lmbd=lmbd, epochs=epochs, batch_size=batch_size, n_hidden_neurons=n_hidden_neurons, n_categories=n_categories,
                  cost_grad='MSE', activation='sigmoid', activation_out='ELU')
-        dnn.train_and_validate(X_val, z_val, MSE_store = plot_MSE, validate=False)
+        dnn.train_and_validate(X_val, z_val, MSE_store = plot_MSE, validate=validate)
 
         z_pred = dnn.predict_probabilities(X_val)
         MSE_array[it] = mean_squared_error(z_val,z_pred)
         hyper[5][it] = dnn.epoch +1
 
-        #Optional: If one wishes to see how the parameter combination is doing:
-        """if(plot_MSE):
+        #Optional: If one wishes to see how the parameter combination is doing, pass plot_MSE = True:
+        if(plot_MSE):
             print("parameters: eta, lmbd, batch, hidden, poly, epochs \n", hyper[:,it:it+1])
             MSE_val, MSE_train = dnn.MSE_epoch()
             epo = np.arange(len(MSE_val))
@@ -71,7 +72,7 @@ def hypertuning_franke(z, x, y, iterations, cols, etamin, etamax, lmbdmin, lmbdm
             plt.ylabel("MSE")
             plt.title("MSE vs epochs")
             plt.legend()
-            plt.show()"""
+            plt.show()
 
         #Estimating the time the iteration takes
         if (it%m.ceil((iterations/60))==0):
@@ -101,15 +102,14 @@ def hypertuning_franke(z, x, y, iterations, cols, etamin, etamax, lmbdmin, lmbdm
     epochs_best = final_hyper[5]
     return hyper[:,MSE_best_index]
 
-
-def hypertuning_CreditCard(X_train, y_train, X_val, y_val, iterations, cols, etamax, etamin, lmbdmax, lmbdmin, batch_sizemax, batch_sizemin, hiddenmax,hiddenmin):
+# cols is number of columns, which corresponds to number of different parameters configurations. This must be larger than number of iterations.
+def hypertuning_CreditCard(X_train, y_train, X_val, y_val, iterations, cols, etamin, etamax, lmbdmin, lmbdmax, batch_sizemin, batch_sizemax, hiddenmin,hiddenmax, epochs = 5):
 
     start_time = time.time()
     if (cols < iterations):
         cols = iterations
         print("cols must be larger than 'iterations. Cols is set equal to iterations")
-    sig = signature(hypertuning_CreditCard)
-    rows = int(len(sig.parameters)/2)
+    rows = 5
     hyper = np.zeros((rows, cols))
     AUC_array = np.zeros(iterations)
     #Making the matrix of parameters 
@@ -131,7 +131,6 @@ def hypertuning_CreditCard(X_train, y_train, X_val, y_val, iterations, cols, eta
         lmbd = hyper_choice[1]
         batch_size = hyper_choice[2]
         n_hidden_neurons = hyper_choice[3]
-        epochs = 20
 
         
         dnn = NN(X_train, y_train, eta=eta, lmbd=lmbd, epochs=epochs, batch_size=batch_size, n_hidden_neurons=n_hidden_neurons, n_categories=n_categories,
@@ -163,7 +162,7 @@ def hypertuning_CreditCard(X_train, y_train, X_val, y_val, iterations, cols, eta
     print("best AUC: ", AUC_best)
     final_hyper = hyper[:,AUC_best_index]
 
-    print("parameters: ", final_hyper)
+    print("parameters: eta, lmbd, batch, hidden, epochs ", final_hyper)
     eta_best = final_hyper[0]
     lmbd_best = final_hyper[1]
     batch_size_best = final_hyper[2]

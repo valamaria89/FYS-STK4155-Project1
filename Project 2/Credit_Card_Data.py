@@ -54,18 +54,17 @@ df['MARRIAGE'].unique()
 X = df.loc[:, df.columns != 'defaultPaymentNextMonth'].values
 y = df.loc[:, df.columns == 'defaultPaymentNextMonth'].values
 
-# Frequency default
 yes = df.defaultPaymentNextMonth.sum()
 no = len(df) - yes
 
-# precentage
+# precentage of defaults non-defaults in the original dataset
 yes_perc = round(yes / len(df) * 100, 1)
 no_perc = round(no / len(df) * 100, 1)
 
 print("Default: ", yes_perc)
 print("Non-Default: ", no_perc)
 
-# HERE
+"""Scales the data set"""
 scaler = StandardScaler()
 scaler.fit(X)
 X = scaler.transform(X)
@@ -73,18 +72,7 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratif
 X_test, X_val, y_test, y_val = train_test_split(X_test, y_test, test_size=0.5, stratify=y_test, random_state=seed)
 
 
-def to_categorical_numpy(integer_vector):
-    n_inputs = len(integer_vector)
-    n_categories = np.max(integer_vector) + 1
-    onehot_vector = np.zeros((n_inputs, n_categories))
-    onehot_vector[range(n_inputs), integer_vector] = 1
-
-    return onehot_vector
-
-
-y_train_onehot, y_test_onehot = to_categorical_numpy(y_train), to_categorical_numpy(y_test)
-
-
+"""Creates the correlation matrix for a pandas data set"""
 def Correlation(df):
     del df['defaultPaymentNextMonth']
     sns.set()
@@ -103,23 +91,17 @@ def Correlation(df):
     plt.show()
 
 
-# Correlation(df)
-
-
-############ Logistic Regression with Gradient Descent ##################
-
-eta = 0.0001  # Learning rate
-
-a = np.random.randn(X_train.shape[1], 1)
-beta_init = np.ones((X_train.shape[1], 1))
+############ Logistic Regression with Gradient Descent and Neural Networks ##################
 
 
 def sigmoid(X, beta, beta_intercept=0):
+
     t = X @ beta + beta_intercept
     siggy = np.array(1 / (1 + np.exp(-t)), dtype=np.float128)
     return np.nan_to_num(siggy)
 
 
+"""Let's you put in a threshold and classify probabilities"""
 def classification(X = None, betas = None, y_test=None, y_prob_input = None, threshold = 0.5):
     y_pred = 0
     prob = 0
@@ -133,7 +115,7 @@ def classification(X = None, betas = None, y_test=None, y_prob_input = None, thr
     else: print("Insert either finished probability predictions or features and weights")
 
     for i in range(len(y_pred)):
-        if prob[i] >= threshold: ## HERE needs variable
+        if prob[i] >= threshold:
             y_pred[i] = 1
         else:
             y_pred[i] = 0
@@ -143,13 +125,7 @@ def classification(X = None, betas = None, y_test=None, y_prob_input = None, thr
     return prob, y_pred, tot / len(y_pred)
 
 
-# Gradient Descent: First we runned with 10 eta values for 1000 iterations and got best auc = 0.7019676, and when running for 100 etas vaules of auc we got 0.703562 with eta 3.59381366e-05
-# Newton Raphson's:
-# Stochastic Gradient Descent: Run 20 different etas for 2 iterations and got best auc = 0.7003253147722386, for eta =0.002069138081114788
-# Mini_batch_SGD: Run for 50 different etas for 10 iterations and got best auc = 0.7032523897887962, eta =0.0005179474679231208
-#
-
-#HERE
+"""Checks the best parameters, i.e. grid search, for a given logistic regression method"""
 def Best_Parameters(epochs, batch_size, method, etamin, etamax, step, y_val, X_val):
     beta_init = np.random.randn(X_train.shape[1], 1)
     eta_vals = np.logspace(etamin, etamax, step)
@@ -172,15 +148,13 @@ def Best_Parameters(epochs, batch_size, method, etamin, etamax, step, y_val, X_v
 
 
 def logistic_regression_SKL(X_train, X_test, y_train, y_test):
-    #HERE
     eta = 0.0007924828983539169
     clf = SGDClassifier(loss='log', penalty='None', max_iter=20, eta0=eta, learning_rate='constant', fit_intercept=True,
                         random_state=seed)
     clf.fit(X_train, y_train.ravel())
     final_betas_LGSKL = clf.coef_.T
-    prob_LGSKL = clf.predict_proba(X_test)[:, 1]  # sigmoid(X_train, final_betas_LGSKL)
-    # prob_LGSKL, y_pred_LGSKL= classification(X_train, final_betas_LGSKL, y_test)[0:2]
-    false_pos_LogReg_Skl, true_pos_LogReg_Skl = roc_curve(y_test, prob_LGSKL)[0:2]  # HERE use test
+    prob_LGSKL = clf.predict_proba(X_test)[:, 1]
+    false_pos_LogReg_Skl, true_pos_LogReg_Skl = roc_curve(y_test, prob_LGSKL)[0:2]
     print("Area under curve LogReg_skl: ", auc(false_pos_LogReg_Skl, true_pos_LogReg_Skl))
 
     plt.plot([0, 1], [0, 1], "k--")
@@ -217,7 +191,6 @@ def SciKitLearn_Classification():
     yes = prob_y.sum()
     no = len(prob_y) - yes
 
-    # precentage
     yes_perc = round(yes / len(prob_y) * 100, 1)
     no_perc = round(no / len(prob_y) * 100, 1)
     print("yes: ", yes_perc)
@@ -234,13 +207,12 @@ def SciKitLearn_Classification():
     x_, y_ = skplt.helpers.cumulative_gain_curve(y_test, y_predict[:, 1])
 
     Score = (np.trapz(y_, x=x_) - 0.5) / (np.trapz(best_line, dx=(1 / len(y_predict))) - 0.5)
-    print("Area ratio score Scikit NN: ", Score)  # Area ratio 0.4791027525012573
+    print("Area ratio score Scikit NN: ", Score)
     AUC = roc_auc_score(y_test, y_predict[:, 1])
     print("AUC score Scikit NN: ", AUC)
 
 
-# SciKitLearn_Classification()
-
+"""Mini batch function set outside of Plots for the purpose of running the GRAD_SGD_MB_plot function through the Plots function."""
 def mini_batch_SGD(eta, batch_size, epochs):
     MB_start_time = time.time()
     np.random.seed(seed)
@@ -252,13 +224,15 @@ def mini_batch_SGD(eta, batch_size, epochs):
     AUC_MB = auc(false_pos_MB, true_pos_MB)
     print("Area under curve MB%s: " %batch_size, AUC_MB)
     MB_time = time.time() - MB_start_time
-    return AUC_MB, MB_time
+    return AUC_MB, MB_time, false_pos_MB, true_pos_MB
 
-def Plots(epochs, AUC_time_plot = 0, ROC_plot = 0, Lift_plot_test_NN = 0, Lift_plot_train_NN = 0, Lift_plot_MB = 0, GD_plot = 0, MB_GD_plot = 0, Stoch_GD_plot = 0,
+
+"""ROC plot puts all the gradient functions and neural network into one graph for comparison"""
+"""The cost functions and plot for the various optimisers, and a scatter function: GD_plot = 0, MB_GD_plot = 0, Stoch_GD_plot = 0, Newton_plot = 0, Scatter_GD_plot = 0 """
+def Plots(epochs, AUC_time_plot = 0, ROC_plot = 0, Lift_plot_test_NN = 0, Lift_plot_train_NN = 0, GD_plot = 0, MB_GD_plot = 0, Stoch_GD_plot = 0,
           Newton_plot = 0, Scatter_GD_plot = 0):
 
     if (ROC_plot == 1 or AUC_time_plot == 1):
-        # 3.59381366e-05
         GRAD_start_time = time.time()
         np.random.seed(seed)
         beta_init = np.random.randn(X_train.shape[1],1)
@@ -269,20 +243,6 @@ def Plots(epochs, AUC_time_plot = 0, ROC_plot = 0, Lift_plot_test_NN = 0, Lift_p
         AUC_GRAD = auc(false_pos_grad, true_pos_grad)
         print("Area under curve gradient: ", AUC_GRAD)
         GRAD_time = time.time() - GRAD_start_time
-
-        AUC_MB5 = 0
-        MB5_time = 0
-        AUC_MB1000 = 0
-        MB1000_time = 0
-        AUC_MB6000 = 0
-        MB6000_time = 0
-        AUC_MB = 0
-        if(AUC_time_plot != 0):
-            AUC_MB5, MB5_time = mini_batch_SGD(0.0038625017292608175, 5, epochs)
-            AUC_MB1000, MB1000_time = mini_batch_SGD(0.0009501185073181439, 1000, epochs)
-            AUC_MB6000, MB6000_time = mini_batch_SGD(0.0001999908383831537, 6000, epochs)
-        else:
-            AUC_MB, _ = mini_batch_SGD(32, epochs)
 
         SGD_start_time = time.time()
         np.random.seed(seed)
@@ -295,26 +255,6 @@ def Plots(epochs, AUC_time_plot = 0, ROC_plot = 0, Lift_plot_test_NN = 0, Lift_p
         print("Area under curve ST: ", AUC_SGD)
         SGD_time = time.time() - SGD_start_time
 
-        # IMPORTANT INFORMATION DONT TAKE IT AWAY!! #####
-        # First roc_curve produced was with optimal found eta for all the methods but only for 3 iterations to show how much more efficent stochastic and mini-batch
-        # is compared to gradient and newton.
-        # In second run roc_curve produced is with the optimal iterations (300) for gradient as well, newton dropped because it is so slow.
-        # Area under curve gradient:  0.7005858407946856 iterations 300
-        # Area under curve MB:  0.7009378481391317 iterations 20
-        # Area under curve ST:  0.7038241794231722 iterations 30
-        # Area under curve NN:  0.7710878832109259 iterations 20, eta = 0.1, lmbd = 0.01, batch_size=25, n_hidden = 41
-        # AUC for iteration 20 for all:
-        # Area under curve gradient:  0.6140996993109424
-        # Area under curve MB:  0.7009378481391317
-        # Area under curve ST:  0.7038241794231722
-        # Area under curve NN:  0.7710878832109259
-
-        # np.random.seed(seed)
-        # final_betas_ST_Skl,_ = w.train(w.stochastic_gradient_descent_Skl)
-        # prob_ST_Skl, y_pred_ST_Skl = classification(X_train,final_betas_ST_Skl, y_test)[0:2]
-        # false_pos_ST_Skl, true_pos_ST_Skl = roc_curve(y_test, prob_ST_Skl)[0:2]
-        # print("Area under curve ST_skl: ", auc(false_pos_ST_Skl, true_pos_ST_Skl))
-
         """np.random.seed(seed)
         beta_init = np.random.randn(X_train.shape[1],1)
         w3 = Weight(X_train,y_train,beta_init,0.001, 20)
@@ -323,46 +263,85 @@ def Plots(epochs, AUC_time_plot = 0, ROC_plot = 0, Lift_plot_test_NN = 0, Lift_p
         false_pos_Newton, true_pos_Newton = roc_curve(y_test, prob_Newton)[0:2]
         print("Area under curve Newton: ", auc(false_pos_Newton, true_pos_Newton))"""
 
-        # np.random.seed(seed)
-        # epochs = 20
-        # batch_size = 25
-        # eta = 0.1
-        # lmbd = 0.01
-        # n_hidden_neurons = 41
-        # n_categories = 1
-        #
-        # dnn = NN(X_train, y_train, eta=eta, lmbd=lmbd, epochs=epochs, batch_size=batch_size,
-        #             n_hidden_neurons=n_hidden_neurons, n_categories=n_categories,
-        #             cost_grad = 'crossentropy', activation = 'sigmoid', activation_out='sigmoid')
-        # dnn.train_and_validate()
-        #
-        # y_predict = dnn.predict_probabilities(X_train)
-        #
-        # false_pos_NN, true_pos_NN = roc_curve(y_test, y_predict)[0:2]
-        # print("AUC score NN: ", auc(false_pos_NN, true_pos_NN))
-
-        # plt.plot([0, 1], [0, 1], "k--")
-        # plt.plot(false_pos_grad, true_pos_grad,label="Gradient")
-        # plt.plot(false_pos_ST, true_pos_ST, label="Stoch")
-        # plt.plot(false_pos_ST_Skl, true_pos_ST_Skl, label="Stoch_Skl")
-        # plt.plot(false_pos_MB, true_pos_MB, label="Mini")
-        # plt.plot(false_pos_Newton, true_pos_Newton, label="Newton")
-        # plt.plot(false_pos_NN, true_pos_NN, label='NeuralNetwork')
-        # plt.legend()
-        # plt.xlabel("False Positive rate")
-        # plt.ylabel("True Positive rate")
-        # plt.title("ROC curve")
-        # plt.show()
-        return AUC_SGD, AUC_GRAD, AUC_MB5, AUC_MB1000, AUC_MB6000, SGD_time, GRAD_time, MB5_time, MB1000_time, MB6000_time
-
-    if (Lift_plot_test_NN == 1):
+        AUC_MB5 = 0
+        MB5_time = 0
+        AUC_MB1000 = 0
+        MB1000_time = 0
+        AUC_MB6000 = 0
+        MB6000_time = 0
+        AUC_MB = 0
+        false_pos_MB = 0
+        true_pos_MB = 0
+        if(AUC_time_plot != 0):
+            AUC_MB5, MB5_time, _, _ = mini_batch_SGD(0.0038625017292608175, 5, epochs)
+            AUC_MB1000, MB1000_time, _, _ = mini_batch_SGD(0.0009501185073181439, 1000, epochs)
+            AUC_MB6000, MB6000_time, _ ,_ = mini_batch_SGD(0.0001999908383831537, 6000, epochs)
+            return AUC_SGD, AUC_GRAD, AUC_MB5, AUC_MB1000, AUC_MB6000, SGD_time, GRAD_time, MB5_time, MB1000_time, MB6000_time
+        else:
+            AUC_MB, _,false_pos_MB, true_pos_MB  = mini_batch_SGD(0.0038625017292608175, 32, epochs)
 
         np.random.seed(seed)
+        beta_init = np.random.randn(X_train.shape[1], 1)
+        w4 = Weight(X_train, y_train, beta_init, 0.0007924828983539169, epochs)
+        final_betas_ST_Skl,_ = w.train(w4.stochastic_gradient_descent_Skl)
+        prob_ST_Skl, y_pred_ST_Skl = classification(X_test,final_betas_ST_Skl[0], y_test)[0:2]
+        false_pos_ST_Skl, true_pos_ST_Skl = roc_curve(y_test, prob_ST_Skl)[0:2]
+        print("Area under curve ST_skl: ", auc(false_pos_ST_Skl, true_pos_ST_Skl))
+
         epochs = 20
         batch_size = 25
         eta = 0.1
         lmbd = 0.01
         n_hidden_neurons = 41
+        ####################
+        # epochs = 20
+        # batch_size = 26
+        # eta = 3.14230708e+00
+        # lmbd = 1.25472709e-02
+        # n_hidden_neurons = 66
+
+        np.random.seed(seed)
+        n_categories = 1
+
+        dnn = NN(X_train, y_train, eta=eta, lmbd=lmbd, epochs=epochs, batch_size=batch_size,
+                    n_hidden_neurons=n_hidden_neurons, n_categories=n_categories,
+                    cost_grad = 'crossentropy', activation = 'sigmoid', activation_out='sigmoid')
+        dnn.train_and_validate()
+
+        y_predict = dnn.predict_probabilities(X_test)
+
+        false_pos_NN, true_pos_NN = roc_curve(y_test, y_predict)[0:2]
+        print("AUC score NN: ", auc(false_pos_NN, true_pos_NN))
+
+        plt.plot([0, 1], [0, 1], "k--")
+        plt.plot(false_pos_grad, true_pos_grad,label="Gradient")
+        plt.plot(false_pos_ST, true_pos_ST, label="Stoch")
+        plt.plot(false_pos_ST_Skl, true_pos_ST_Skl, label="Stoch_Skl")
+        plt.plot(false_pos_MB, true_pos_MB, label="Mini")
+        # plt.plot(false_pos_Newton, true_pos_Newton, label="Newton")
+        plt.plot(false_pos_NN, true_pos_NN, label='NeuralNetwork')
+        plt.legend()
+        plt.xlabel("False Positive rate")
+        plt.ylabel("True Positive rate")
+        plt.title("ROC curve")
+        plt.show()
+
+    """Creates cumulative gain charts/lift plots for Neural network. The two optimal parameters sets from tuning are listed below"""
+    if (Lift_plot_test_NN == 1):
+
+        np.random.seed(seed)
+
+        # epochs = 20
+        # batch_size = 26
+        # eta = 3.14230708e+00
+        # lmbd = 1.25472709e-02
+        # n_hidden_neurons = 66
+        epochs = 20
+        batch_size = 25
+        eta = 0.1
+        lmbd = 0.01
+        n_hidden_neurons = 41
+
         n_categories = 1
 
         dnn = NN(X_train, y_train, eta=eta, lmbd=lmbd, epochs=epochs, batch_size=batch_size,
@@ -399,6 +378,7 @@ def Plots(epochs, AUC_time_plot = 0, ROC_plot = 0, Lift_plot_test_NN = 0, Lift_p
         plt.title("Cumulative Gain Chart for Test Data")
         plt.show()
 
+        """Let's you insert a threshold and classify"""
         _, y_predict, y_predict_tot = classification(y_prob_input=y_predict_proba, threshold=0.5)
         pos = y_predict.sum()
         neg = len(y_predict) - pos
@@ -410,6 +390,12 @@ def Plots(epochs, AUC_time_plot = 0, ROC_plot = 0, Lift_plot_test_NN = 0, Lift_p
     if (Lift_plot_train_NN == 1):
 
         np.random.seed(seed)
+
+        # epochs = 20
+        # batch_size = 26
+        # eta = 3.14230708e+00
+        # lmbd = 1.25472709e-02
+        # n_hidden_neurons = 66
         epochs = 20
         batch_size = 25
         eta = 0.1
@@ -440,7 +426,7 @@ def Plots(epochs, AUC_time_plot = 0, ROC_plot = 0, Lift_plot_test_NN = 0, Lift_p
         x_, y_ = skplt.helpers.cumulative_gain_curve(y_train, y_predict_proba_tuple[:, 1])
 
         Score = (np.trapz(y_, x=x_) - 0.5) / (np.trapz(best_line, dx=(1 / len(y_predict_proba))) - 0.5)
-        print('Area ratio score(train)', Score)  # The score  Area ratio = 0.49129354889528054 Neural Network train against predicted
+        print('Area ratio score(train)', Score)
         perc = np.linspace(0, 100, len(y_train))
         plt.plot(x_ * 100, y_ * 100)
         plt.plot(perc, best_line * 100)
@@ -451,6 +437,7 @@ def Plots(epochs, AUC_time_plot = 0, ROC_plot = 0, Lift_plot_test_NN = 0, Lift_p
         plt.title("Cumulative Gain Chart for Train Data")
         plt.show()
 
+        """Let's you insert a threshold and classify"""
         _, y_predict, y_predict_tot = classification(y_prob_input=y_predict_proba, threshold=0.5)
         pos = y_predict.sum()
         neg = len(y_predict) - pos
@@ -458,48 +445,6 @@ def Plots(epochs, AUC_time_plot = 0, ROC_plot = 0, Lift_plot_test_NN = 0, Lift_p
         neg_perc = (neg / len(y_predict))
         print("default: ", pos_perc)
         print("Non-default: ", neg_perc)
-
-    if (Lift_plot_MB == 1):
-        np.random.seed(seed)
-
-        beta_init = np.random.randn(X_train.shape[1], 1)
-        w1 = Weight(X_train, y_train, beta_init, 3.59381366e-05, 350)
-
-        final_betas_MB, _ = w1.train(w1.gradient_descent)
-        prob_MB, y_pred_MB = classification(X_train, final_betas_MB, y_test)[0:2]
-
-        y_probs = np.concatenate((1 - prob_MB, prob_MB), axis=1)
-
-        yes = y_pred_MB.sum()
-        no = len(y_pred_MB) - yes
-
-        yes_perc = round(yes / len(y_pred_MB) * 100, 1)
-        no_perc = round(no / len(y_pred_MB) * 100, 1)
-        print("yes: ", yes_perc)
-        print("no: ", no_perc)
-
-        x = np.linspace(0, 1, len(y_pred_MB))
-        m = 100 / yes_perc
-
-        best_line = np.zeros((len(x)))
-        for bleh in range(len(x)):
-            best_line[bleh] = m * x[bleh]
-            if (x[bleh] > yes_perc / 100):
-                best_line[bleh] = 1
-
-        x_, y_ = skplt.helpers.cumulative_gain_curve(y_test, y_probs[:, 1])
-
-        Score = (np.trapz(y_, x=x_) - 0.5) / (np.trapz(best_line, dx=(1 / len(y_pred_MB))) - 0.5)
-        print(Score)  # The score  Area ratio = 0.49167470576088995 Neural Network train against predicted
-        perc = np.linspace(0, 100, len(x))
-        plt.plot(np.linspace(0, 100, len(x_)), y_)
-        plt.plot(perc, best_line)
-        plt.plot(perc, np.linspace(0, 1, len(x)), "k--")
-
-        plt.xlabel("Precentage of people")
-        plt.ylabel("Default payment")
-        plt.title("Lift Chart for Train")
-        plt.show()
 
     beta_init = np.random.randn(X_train.shape[1], 1)
     w = Weight(X_train, y_train, beta_init, 0.0007924828983539169, epochs)
@@ -539,30 +484,11 @@ def Plots(epochs, AUC_time_plot = 0, ROC_plot = 0, Lift_plot_test_NN = 0, Lift_p
         plt.scatter(x_sigmoid, prob_train)
         plt.show()
 
-# seed 3000
-# val:
-# SGD : 0.730240972331133, 0.0007924828983539169
 
-# GD : 0.7283247850339899, 6.892612104349695e-05
 
-# MB5, (0.7307747166540493, 0.0038625017292608175)
 
-# MB1000, (0.7312981346055423, 0.0009501185073181439)
 
-# MB6000, (0.7295361974815271, 0.0001999908383831537)
-
-# test
-# Area under curve gradient:  0.67917592888678
-# Area under curve MB5:  0.7034870002269351
-# Area under curve MB1000:  0.70368234496204
-# Area under curve MB6000:  0.698950231576993
-# Area under curve SGD:  0.703020235909391
-
-# print(Best_Parameters(epochs = 20, batch_size = 5, method = "mini_batch_gradient_descent", etamin = -6, etamax = 0.7, step=100, y_val=y_val, X_val=X_val))
-# print(Best_Parameters(epochs = 20, batch_size = 1000, method = "mini_batch_gradient_descent", etamin = -6, etamax = 0.7, step=100, y_val=y_val, X_val=X_val))
-# print(Best_Parameters(epochs = 20, batch_size = 6000, method = "mini_batch_gradient_descent", etamin = -6, etamax = 0.7, step=100, y_val=y_val, X_val=X_val))
-# Plots(epochs = 20, ROC_plot = 0, Lift_plot_test_NN = 1, Lift_plot_train_NN = 1, Lift_plot_MB = 0, GD_plot = 0, MB_GD_plot = 0, Stoch_GD_plot = 0, Newton_plot = 0, Scatter_GD_plot = 0)
-
+"""This function compares with plots the AUC convergence and time used for several different gradient methods. E.g MB1000 means Mini-batch gradient descent with mini bath size of 1000 """
 def GRAD_SGD_MB_plot(epochs):
     start_time = time.time()
     AUC_and_time = np.zeros((10,epochs))
@@ -607,5 +533,18 @@ def GRAD_SGD_MB_plot(epochs):
 
 # GRAD_SGD_MB_plot(21)
 # logistic_regression_SKL(X_train, X_test, y_train, y_test)
-print(hypertuning_CreditCard(10, 10, 1, -4, 1, -4, 100, 1, 100, 1))
+
+"""hypertuning_CreditCard(X_train, y_train, X_val, y_val, iterations, cols, etamin, etamax, lmbdmin, lmbdmax, batch_sizemin, batch_sizemax, hiddenmin,hiddenmax):"""
+
+"""Run hypertuning over the parameters """
+# hypertuning_CreditCard(X_train, y_train, X_val, y_val, 20, 20, -4, 1, -4, 1, 1, 100, 1, 80, epochs= 3)
+
+"""See the lift plots"""
+# Plots(epochs = 20, ROC_plot = 0, Lift_plot_test_NN = 1, Lift_plot_train_NN = 1, GD_plot = 0, MB_GD_plot = 0, Stoch_GD_plot = 0, Newton_plot = 0, Scatter_GD_plot = 0)
+
+"""Check best parameters for minibatch gd"""
+# print(Best_Parameters(epochs = 20, batch_size = 32, method = "mini_batch_gradient_descent", etamin = -6, etamax = 0.7, step=100, y_val=y_val, X_val=X_val))
+
+"""Show Roc plot"""
+# Plots(epochs = 3, ROC_plot = 1, Lift_plot_test_NN = 0, Lift_plot_train_NN = 0, GD_plot = 0, MB_GD_plot = 0, Stoch_GD_plot = 0, Newton_plot = 0, Scatter_GD_plot = 0)
 

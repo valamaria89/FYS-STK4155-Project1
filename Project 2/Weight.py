@@ -1,5 +1,8 @@
 import numpy as np
 from numpy.linalg import pinv
+from sklearn.linear_model import SGDClassifier
+
+seed = 3000
 
 """This script include the class Weight which is used for Logistic Regression and the credit card data. In weight you can find all the 
 methods used in this project to obtain result for the Logistic Regression: Gradient Descent, Newtons method, Stochastic GD with and without 
@@ -14,7 +17,7 @@ def sigmoid(X, beta):
 
 class Weight:
 
-    def __init__(self, X, y, beta, eta, iterations = 500):
+    def __init__(self, X, y, beta, eta, iterations=500, batch_size=32):
         self.X = X
         self.y = y
         self.y_all = y
@@ -23,6 +26,7 @@ class Weight:
         self.eta = eta
         self.iterations = iterations
         self.epoch = 0
+        self.batch_size = batch_size
         
 
     def gradient_descent(self):
@@ -56,7 +60,10 @@ class Weight:
         return Xshuffled, yshuffled
         
     def mini_batch_gradient_descent(self):
-        M = 32
+        M = self.batch_size
+        if (self.X_all.shape[0] % M != 0):
+            print("Length of X is not divisble by the mini-batches. Use function in Misc to pick a different size")
+            return
         m = int(self.X_all.shape[0]/M)
         
         Xshuffled, yshuffled = self.shuffle()
@@ -99,7 +106,8 @@ class Weight:
         return self.beta, clf.predict_proba
 
     def cost_function(self):
-        return -np.sum(self.y * np.log(sigmoid(self.X, self.beta)) + (1 - self.y) * np.log(1 - sigmoid(self.X, self.beta))) / (len(self.y))
+        eps = np.finfo(float).eps
+        return -np.sum(self.y * np.log(sigmoid(self.X, self.beta) + eps) + (1 - self.y) * np.log(1 - sigmoid(self.X, self.beta) + eps)) / (len(self.y))
 
     def train(self, method):
         self.cost_all = np.array([])

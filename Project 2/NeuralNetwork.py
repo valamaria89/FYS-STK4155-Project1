@@ -192,21 +192,25 @@ class NeuralNetwork:
 #This function was mase for the purpose of hypertuning the parameters for the franke data. Using this will induce early stopping if the combination of parameters
 #is to bad. Makes the hypertuning more efficent. 
     def validate_and_early_stopping(self, X_val, y_val):
+        check_start_epoch = 50 # when to start checking if average is higher
+        check_area = 50 # the number of epoch to run average
+        flatness_condition_stop = 100 # When to stop checking if two MSEs 15 epochs apart is approximately equal(3 decimal). This should be stopped at an epoch as final epochs close to convergence can be approximately similar
+        strong_flatness_condition_start = 10 # When to start checking for: If three MSE's in a row are approximately equal(7 decimal) then stop.
 
         self.MSE_val_oldest = self.MSE_val_old
         self.MSE_val_old = self.MSE_val
         y_pred_epoch = self.predict_probabilities(X_val)
         self.MSE_val = mean_squared_error(y_val, y_pred_epoch.flatten())
-        check_area = 50
 
 
-        if ((self.MSE_val_old != 0) and (self.MSE_val / self.MSE_val_old >= 10)):  # ad hoc settings. This one breaks if we have enormous spikes
+
+        if ((self.MSE_val_old != 0) and (self.MSE_val / self.MSE_val_old >= 10)):   #This one breaks if we have enormous spikes
             return True
 
-        elif((round(self.MSE_val_oldest,7) == round(self.MSE_val_old,7) == round(self.MSE_val,7)) and (self.epoch > 10)):
+        elif((round(self.MSE_val_oldest,7) == round(self.MSE_val_old,7) == round(self.MSE_val,7)) and (self.epoch > strong_flatness_condition_start)):
             return True
 
-        if(self.epoch % 15 == 0) and (self.epoch < 100):
+        if(self.epoch % 15 == 0) and (self.epoch < flatness_condition_stop):
             if (round(self.MSE_val,3)==round(self.MSE_check,3)):
                 return True
             else:
@@ -230,7 +234,7 @@ class NeuralNetwork:
                     MSE_average = 0
                     self.MSE_val_tot = 0
             self.avrg_counter -= 1
-        elif((self.MSE_val > self.MSE_val_old) and (self.avrg_counter == 0) and (self.epoch > 50)):
+        elif((self.MSE_val > self.MSE_val_old) and (self.avrg_counter == 0) and (self.epoch > check_start_epoch)):
             self.avrg_counter = check_area-1
             self.MSE_val_stored = self.MSE_val_old
             self.MSE_val_tot = self.MSE_val
@@ -264,7 +268,6 @@ class NeuralNetwork:
                 chosen_datapoints = np.random.choice(
                     data_indices, size=self.batch_size, replace=False
                 )
-
                 self.X_data = self.X_data_full[chosen_datapoints]
                 self.Y_data = self.Y_data_full[chosen_datapoints]
 
