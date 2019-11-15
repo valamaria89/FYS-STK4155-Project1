@@ -1,6 +1,9 @@
 import numpy as np
 from numpy.linalg import pinv
 
+"""This script include the class Weight which is used for Logistic Regression and the credit card data. In weight you can find all the 
+methods used in this project to obtain result for the Logistic Regression: Gradient Descent, Newtons method, Stochastic GD with and without 
+mini batch. It also includes the coss entropy cost function and the training of the model."""
 
 def sigmoid(X, beta):
 
@@ -75,9 +78,7 @@ class Weight:
 
     def stochastic_gradient_descent(self):
         m = len(self.y_all)
-        #random.seed(seed)
         Xshuffled, yshuffled = self.shuffle()
-        #print(self.eta)
         self.cost = np.array([])
         for i in range(m):
 
@@ -86,14 +87,12 @@ class Weight:
             gradient = -(self.X.T @ (self.y - sigmoid(self.X, self.beta)))
             #self.eta = self.learning_schedule((self.epoch*m+i)*1)
             self.beta -=  self.eta*gradient
-            #print(self.beta)
             self.cost = np.append(self.cost, self.cost_function())
         return self.beta
 
     def stochastic_gradient_descent_Skl(self):
         m = len(self.y_all)
         self.cost = np.array([])
-        # self.X, self.y = self.shuffle()
         clf = SGDClassifier(loss="log", penalty="l2", max_iter=self.iterations, shuffle=True, random_state=seed)
         clf.fit(self.X_all, self.y_all.ravel(), coef_init=self.beta)
         self.beta = (clf.coef_).T

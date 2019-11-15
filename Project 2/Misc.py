@@ -3,18 +3,22 @@ from random import random, seed
 import numpy as np 
 from sklearn.model_selection import train_test_split
 
-seed = 3500
+
+""" In this script there are functions that are used with both data sets and some that are only used in Franke
+"""
+seed = 3000
 
 
 
-train_percentage = 0.9 #0.64
-test_percentage =  0.05 #0.2304
-validation_percentage = 0.05 #0.1296
+train_percentage = 0.64
+test_percentage =  0.2304
+validation_percentage = 0.1296
 
 split_train_test = 1 - train_percentage
 split_test_val = validation_percentage/split_train_test
 
 
+# Producing the Franke function
 def FrankeFunction(x,y):
     term1 = 0.75*np.exp(-(0.25*(9*x-2)**2) - 0.25*((9*y-2)**2))
     term2 = 0.75*np.exp(-((9*x+1)**2)/49.0 - 0.1*(9*y+1))
@@ -22,6 +26,7 @@ def FrankeFunction(x,y):
     term4 = -0.2*np.exp(-(9*x-4)**2 - (9*y-7)**2)
     return term1 + term2 + term3 + term4
 
+# A code to find the perfect squares if one need to
 def perfectSquares(low_n, high_n, l_perc, h_perc, squares):
 
     for n in range(low_n, high_n+1):
@@ -52,6 +57,7 @@ def perfectSquares(low_n, high_n, l_perc, h_perc, squares):
 
 #perfectSquares(400,625, 0.01, 0.6, 3)
 
+# Making the design matrix for the Franke function: 
 def CreateDesignMatrix_X(z, x, y, n ):
     """
     Function for creating a design X-matrix with rows [1, x, y, x^2, xy, xy^2 , etc.]
@@ -76,7 +82,7 @@ def CreateDesignMatrix_X(z, x, y, n ):
 
     return X, X_train, X_test, X_val, z_train, z_test, z_val, indicies
 
-
+#Shuffles the data by indencies 
 def shuffle(X, z):
     shuffle_ind = np.arange(X.shape[0])
     np.random.seed(seed)
@@ -88,6 +94,7 @@ def shuffle(X, z):
         zshuffled[ind] = z[shuffle_ind[ind]]
     return Xshuffled, zshuffled, shuffle_ind     
 
+#Backshuffles the data after it has been shuffled if needed for plotting: 
 def backshuffle(X, z, X_train_s, X_test_s, z_train_s ,z_test_s ,indicies):
     train_indicies, test_val_indicies = train_test_split(indicies, test_size=split_train_test, random_state=seed, shuffle=False)
     test_indicies = train_test_split(test_val_indicies, test_size=split_test_val, random_state=seed, shuffle=False)[0]

@@ -11,6 +11,8 @@ from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 import random
 import math
 
+""" In this script one finds the Neural Network class which is build so it can function for both Franke (øinear) and Credit Card data (classification)."""
+
 seed = 3000
 np.random.seed(seed)
 
@@ -75,8 +77,8 @@ class NeuralNetwork:
         self.output_bias_old = None
 
         self.create_biases_and_weights()
+    
     #Activation functions: 
-
     def sigmoid(self, z):
         siggy = 1 / (1 + np.exp(-z))
         return np.nan_to_num(siggy)
@@ -94,8 +96,7 @@ class NeuralNetwork:
         return np.nan_to_num(np.tanh(z))
 
     
-    #Derivatives of activation function
-
+    #Derivatives of activation function:
     def sigmoid_grad(self, a):
         return np.nan_to_num(a*(1-a))
     
@@ -118,8 +119,9 @@ class NeuralNetwork:
     def MSE(self, a, y):
         return (a-y)    
 
-
+#Creates the biases and weights 
     def create_biases_and_weights(self):
+
         self.hidden_weights = np.random.randn(self.n_features, self.n_hidden_neurons)#*1e-3
         self.hidden_bias = np.zeros(self.n_hidden_neurons) + 0.01
 
@@ -127,17 +129,13 @@ class NeuralNetwork:
         self.output_bias = np.zeros(self.n_categories) + 0.01
 
     def feed_forward(self):
-        # feed-forward for training
-        # print(np.matmul(self.X_data, self.hidden_weights))
+        #Feed forward 
         self.z_h = np.matmul(self.X_data, self.hidden_weights) + self.hidden_bias
         self.a_h = self.activation(self.z_h)
 
         self.z_o = np.matmul(self.a_h, self.output_weights) + self.output_bias
 
         self.a_o = self.activation_out(self.z_o)
-
-        #exp_term = np.exp(self.z_o)
-        #self.probabilities = exp_term / np.sum(exp_term, axis=1, keepdims=True)
 
     def feed_forward_out(self, X):
         # feed-forward for output
@@ -146,12 +144,11 @@ class NeuralNetwork:
 
         z_o = np.matmul(a_h, self.output_weights) + self.output_bias
         a_o = self.activation_out(z_o)
-
-        #exp_term = np.exp(z_o)
-        #probabilities = exp_term / np.sum(exp_term, axis=1, keepdims=True)
         return a_o
 
+#The backpropogation function
     def backpropagation(self):
+
         error_output = self.activation_out_grad(self.activation_out(self.z_o))*self.cost_grad(self.a_o,self.Y_data)
         error_hidden = np.matmul(error_output, self.output_weights.T) * self.activation_grad(self.a_h)
 
@@ -179,6 +176,7 @@ class NeuralNetwork:
         probabilities = self.feed_forward_out(X)
         return probabilities
 
+#This function was mase for the purpose of hypertuning the parameters for the franke data. Using this will give the MSE for validation and train data.
     def MSE_epoch(self):
         if not (self.MSE_store):
             print("Run train_and_validate again with MSE_store = True")
@@ -191,6 +189,8 @@ class NeuralNetwork:
             MSE_train[i] = mean_squared_error(self.Y_data_full.flatten(), self.y_predict_train_epochs[i])
         return MSE_val, MSE_train
 
+#This function was mase for the purpose of hypertuning the parameters for the franke data. Using this will induce early stopping if the combination of parameters
+#is to bad. Makes the hypertuning more efficent. 
     def validate_and_early_stopping(self, X_val, y_val):
 
         self.MSE_val_oldest = self.MSE_val_old
@@ -245,7 +245,8 @@ class NeuralNetwork:
         self.hidden_bias_old = self.hidden_bias
         self.output_bias_old = self.output_bias
         return False
-
+        
+#Training and validating. Both for hypertuning and also generally for training det network for the data at hand:
     def train_and_validate(self, X_val = None, y_val = None , MSE_store=False, validate =False):
         # If there's no parameters passed to the method than it will train, if there is then it will train and validate with validate_and_early_stopping
         if (X_val is not None):
